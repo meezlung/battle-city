@@ -1,6 +1,5 @@
 import pyxel
 from dataclasses import dataclass
-# from time import sleep
 import pyxelgrid # type: ignore
 from random import randint
 
@@ -23,6 +22,10 @@ class Stone:
     x: int
     y: int
 
+@dataclass
+class Brick(Stone):
+    hp: int
+
 class Game:
     def __init__(self):
         self.tank = Tank(0, 0, 'right', 16, 1)
@@ -33,8 +36,11 @@ class Game:
 
         self.is_shoot_bullet = False
 
+        self.map_database: list[list[Stone | Brick | Tank | Bullet | int]] = [[0 for _ in range(25)] for _ in range(16)]
+
         self.num_stones: int = 10
         self.num_tanks: int = 5
+
         self.stone_cells_location: list[Stone] = []
         self.enem_tank: list[Tank] = []
 
@@ -42,9 +48,37 @@ class Game:
 
         self.generate_stone_cells()
         self.generate_enem_tank()
+        print(self.map_database) # just to check what it looks like after generating
 
         pyxel.load('assets/assets.pyxres')
         pyxel.run(self.update, self.draw)
+
+    # Main priority in generation is to ensure that the tanks and stones do not overlap each other
+    def generate_stone_cells(self):
+        for _ in range(self.num_stones):
+            x_i = randint(0, 24)
+            y_i = randint(0, 15)
+
+            if self.check_if_pos_is_unique(x_i, y_i):
+                stone = Stone(x=16 * x_i, y=16 * y_i)
+                self.map_database[y_i][x_i] = stone
+                self.stone_cells_location.append(stone)
+
+    def generate_enem_tank(self):
+        for _ in range(self.num_tanks):
+            x_i = randint(0, 24)
+            y_i = randint(0, 15)
+
+            if self.check_if_pos_is_unique(x_i, y_i):
+                enem_tank = Tank(x=16 * x_i, y=16 * y_i, direction='up', speed=16, hp=1)
+                self.map_database[y_i][x_i] = enem_tank
+                self.enem_tank.append(enem_tank)
+
+    # TODO: Spawn our tank
+
+    def check_if_pos_is_unique(self, x: int, y: int) -> bool:
+        return self.map_database[y][x] == 0
+
 
     def shoot_bullets(self):
         print('Bullet position:', self.bullet.x, self.bullet.y)
@@ -84,17 +118,6 @@ class Game:
 # generate objects in environment
 # TODO Make collision checks so that the tanks and stones do not overlap each other in generation
 # sidenote: this check might only have to be applied on tanks once we implement the map loading feature
-    def generate_stone_cells(self):
-        for _ in range(self.num_stones):
-            stone = Stone(x=16 * randint(1, 24), y=16 * randint(1, 15))
-            self.stone_cells_location.append(stone)
-        print(self.stone_cells_location)
-
-    def generate_enem_tank(self):
-        for _ in range(self.num_tanks):
-            gentank = Tank(16 * randint(1, 24), 16 * randint(1, 15), 'up', 16, 1)
-            self.enem_tank.append(gentank)
-        print(self.enem_tank)
 #-------------------------------------------------------------------------------------
 
 # main collision checker
