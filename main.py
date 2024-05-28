@@ -59,13 +59,13 @@ class Game:
             y_i = randint(0, 15)
 
             if self.check_if_pos_is_unique(x_i, y_i):
-                stone = Stone(x_i,y_i)
+                stone = Stone(x_i, y_i)
                 self.map_database[y_i][x_i] = stone
 
     def generate_player_tank(self):
         tank = Tank(0, 0, 'right', 1, 1)
-        self.player_tank_pos: tuple[int,int,str] = (0,0, 'right')
-        self.player_bullet_pos: tuple[int,int,str] = (0,0, 'right')
+        self.player_tank_pos: tuple[int, int, str] = (0, 0, 'right')
+        self.player_bullet_pos: tuple[int, int, str] = (0, 0, 'right')
         self.map_database[0][0] = tank
 
     def generate_enem_tank(self):
@@ -74,7 +74,7 @@ class Game:
             y_i = randint(0, 15)
 
             if self.check_if_pos_is_unique(x_i, y_i):
-                enem_tank = EnemyTank(x_i, y_i, 'up', 1, 1)
+                enem_tank = EnemyTank(x_i, y_i, 'up', 1, 1) # randomize direction soon
                 self.map_database[y_i][x_i] = enem_tank
 
     def generate_static_bullet_pos(self):
@@ -96,42 +96,52 @@ class Game:
                         destroypos = self.map_database[destroyposrow].index(tank)
                         self.map_database[destroyposrow][destroypos] = 0
 
-# main collision checker + entity movement function
+    # main collision checker + entity movement function
     def movement(self, direction: str, entity: str, x: int, y: int):
-        current_point = (x,y)
-        point = (0,0)
-        dirvector = [(x-1,y),(x+1,y),(x,y-1),(x,y+1)]
+        current_point = (x, y)
+        point = (0, 0)
+        dirvector: dict[str, tuple[int, int]] = {
+            'left': (x - 1, y),
+            'right': (x + 1, y),
+            'up': (x, y - 1),
+            'down': (x, y + 1)
+        }
 
-        #checks which input was made in order to use the correct dirvector tuple
-        if direction == 'left':
-            point = dirvector[0]
-            
-        if direction == 'right':
-            point = dirvector[1]
-        
-        if direction == 'up':
-            point = dirvector[2]
-        
-        if direction == 'down':
-            point = dirvector[3]
+        # checks which input was made in order to use the correct dirvector tuple
+        if direction in dirvector:
+            point = dirvector[direction]
 
-        #bounds checking:
-        if not -1 < point[0] < self.screen_width//16 or not -1 < point[1] < self.screen_height//16:
+        # bounds checking:
+        if not (0 <= point[0] < self.screen_width//16) or not (0 <= point[1] < self.screen_height//16):
             print('YOU SHALL NOT PASS!!')
+            if entity == 'player':
+                entity_move = self.map_database[current_point[1]][current_point[0]] 
+                if isinstance(entity_move, Tank):
+                    entity_move.direction = direction
             if entity == 'bullet':
-                self.map_database[current_point[1]][current_point[0]] = 0
+                if type(self.map_database[current_point[1]][current_point[0]]) != Tank:
+                    self.map_database[current_point[1]][current_point[0]] = 0
                 self.is_shoot_bullet = False
 
-        #check if there is an entity ahead of the entity trying to move, if there is one, do not move
-        elif type(self.map_database[point[1]][point[0]]) == Stone:
+        # check if there is an entity ahead of the entity trying to move, if there is one, do not move
+        elif isinstance(self.map_database[point[1]][point[0]], Stone):
+            if entity == 'player':
+                entity_move = self.map_database[current_point[1]][current_point[0]] 
+                if isinstance(entity_move, Tank):
+                    entity_move.direction = direction
             print('YOU SHALL NOT PASS!!')
-            #might need to refactor this code some time...
+            # might need to refactor this code some time...
             if entity == 'bullet':
-                self.map_database[current_point[1]][current_point[0]] = 0
+                if type(self.map_database[current_point[1]][current_point[0]]) != Tank:
+                    self.map_database[current_point[1]][current_point[0]] = 0
                 self.is_shoot_bullet = False
 
         elif isinstance(self.map_database[point[1]][point[0]], EnemyTank):
             print('YOU SHALL NOT PASS!!')
+            if entity == 'player':
+                entity_move = self.map_database[current_point[1]][current_point[0]] 
+                if isinstance(entity_move, Tank):
+                    entity_move.direction = direction
             if entity == 'bullet':
                 if type(self.map_database[current_point[1]][current_point[0]]) != Tank:
                     self.map_database[current_point[1]][current_point[0]] = 0
@@ -140,12 +150,12 @@ class Game:
                 if isinstance(chk_entity, (EnemyTank)):
                     chk_entity.hp -= 1
 
-        #reflect changes into map_database
+        # reflect changes into map_database
         else:
             # a bullet generates differently than any other entity, thus it must be treated as a separate case
             if entity == 'bullet': 
-                self.map_database[point[1]][point[0]] = Bullet(point[0],point[1],direction)
-                self.player_bullet_pos = (point[0],point[1], direction)
+                self.map_database[point[1]][point[0]] = Bullet(point[0], point[1], direction)
+                self.player_bullet_pos = (point[0], point[1], direction)
 
                 # edge case - if the bullet just spawned, this will prevent setting the tank to 0
                 if isinstance(self.map_database[current_point[1]][current_point[0]], Bullet):
@@ -156,18 +166,17 @@ class Game:
 
                 entity_move = self.map_database[point[1]][point[0]]
 
-                print(self.map_database[point[1]][point[0]])
-
-                if isinstance(entity_move, (Stone, Brick, Tank, Bullet)):
+                if isinstance(entity_move, (Tank)):
                     entity_move.x = point[0]
                     entity_move.y = point[1]
             
                 self.map_database[current_point[1]][current_point[0]] = 0
 
                 if entity == 'player':
-                    self.player_tank_pos = (point[0],point[1], direction)
+                    self.player_tank_pos = (point[0], point[1], direction)
                     if isinstance(entity_move, Tank):
                         entity_move.direction = direction
+
 
     def update(self):
         if pyxel.btnp(pyxel.KEY_Q):
@@ -198,13 +207,13 @@ class Game:
 
         self.tankhp()
 
-        if self.is_shoot_bullet:
-            print('shooting!')
-            self.movement(self.player_bullet_pos[2], 'bullet', self.player_bullet_pos[0], self.player_bullet_pos[1])
-
         if pyxel.btnp(pyxel.KEY_SPACE) and not self.is_shoot_bullet:
             self.is_shoot_bullet = True
             self.generate_static_bullet_pos()
+
+        if self.is_shoot_bullet:
+            print('shooting!', self.player_bullet_pos)
+            self.movement(self.player_bullet_pos[2], 'bullet', self.player_bullet_pos[0], self.player_bullet_pos[1])
 
 
 
