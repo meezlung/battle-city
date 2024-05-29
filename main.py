@@ -42,7 +42,7 @@ class Game:
         self.num_stones: int = 10
         self.num_tanks: int = 5
 
-        pyxel.init(self.screen_width, self.screen_height, fps=60)
+        pyxel.init(self.screen_width, self.screen_height, fps=60, )
 
         self.generate_player_tank()
         self.generate_stone_cells()
@@ -218,7 +218,7 @@ class Game:
 
 
     def draw(self):
-        pyxel.cls(0)
+        pyxel.cls(4)
 
         #generate graphics based on map_database
         for row in self.map_database:
