@@ -126,6 +126,7 @@ class Game:
                 entity_move = self.map_database[current_point[1]][current_point[0]] 
                 if isinstance(entity_move, Tank):
                     entity_move.direction = direction
+                    self.player_tank_pos = (current_point[0], current_point[1], direction)
             if entity == 'enemy':
                 entity_move = self.map_database[current_point[1]][current_point[0]] 
                 if isinstance(entity_move, EnemyTank):
@@ -141,6 +142,7 @@ class Game:
                 entity_move = self.map_database[current_point[1]][current_point[0]] 
                 if isinstance(entity_move, Tank):
                     entity_move.direction = direction
+                    self.player_tank_pos = (current_point[0], current_point[1], direction)
             if entity == 'enemy':
                 entity_move = self.map_database[current_point[1]][current_point[0]] 
                 if isinstance(entity_move, EnemyTank):
@@ -158,6 +160,7 @@ class Game:
                 entity_move = self.map_database[current_point[1]][current_point[0]] 
                 if isinstance(entity_move, Tank):
                     entity_move.direction = direction
+                    self.player_tank_pos = (current_point[0], current_point[1], direction)
             if entity == 'enemy':
                 entity_move = self.map_database[current_point[1]][current_point[0]] 
                 if isinstance(entity_move, EnemyTank):
@@ -262,7 +265,7 @@ class Game:
 
 
     def draw(self):
-        pyxel.cls(0)
+        pyxel.cls(4)
 
         #generate graphics based on map_database
         for row in self.map_database:
