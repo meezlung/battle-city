@@ -2,24 +2,25 @@ import pyxel
 from dataclasses import dataclass
 import pyxelgrid # type: ignore
 from random import randint
+from typing import Literal, cast
 
 @dataclass
 class Bullet:
     x: int
     y: int
-    direction: str
+    direction: Literal['left', 'right', 'up', 'down']
 
 @dataclass
 class Tank:
     x: int
     y: int
-    direction: str
+    direction: Literal['left', 'right', 'up', 'down']
     speed: int
     hp: int
 
 @dataclass
 class EnemyTank(Tank):
-    pass
+    label: str
 
 @dataclass
 class Stone:
@@ -41,6 +42,8 @@ class Game:
 
         self.num_stones: int = 10
         self.num_tanks: int = 5
+
+        self.visited_enemy_tanks_so_far: set[str] = set() 
 
         pyxel.init(self.screen_width, self.screen_height, fps=60)
 
@@ -64,18 +67,33 @@ class Game:
 
     def generate_player_tank(self):
         tank = Tank(0, 0, 'right', 1, 1)
-        self.player_tank_pos: tuple[int, int, str] = (0, 0, 'right')
-        self.player_bullet_pos: tuple[int, int, str] = (0, 0, 'right')
+        self.player_tank_pos: tuple[int, int, Literal['left', 'right', 'up', 'down']] = (0, 0, 'right')
+        self.player_bullet_pos: tuple[int, int, Literal['left', 'right', 'up', 'down']] = (0, 0, 'right')
         self.map_database[0][0] = tank
 
     def generate_enem_tank(self):
+        random_label = 33
         for _ in range(self.num_tanks):
             x_i = randint(0, 24)
             y_i = randint(0, 15)
 
             if self.check_if_pos_is_unique(x_i, y_i):
-                enem_tank = EnemyTank(x_i, y_i, 'up', 1, 1) # randomize direction soon
+                print(x_i, y_i)
+                enem_tank = EnemyTank(x_i, y_i, 'up', 1, 1, chr(random_label)) # we should generate randomize labels infinitely to prevent bug in infinitely many tanks generation
                 self.map_database[y_i][x_i] = enem_tank
+                random_label += 1
+            else:
+                while not self.check_if_pos_is_unique(x_i, y_i):
+                    x_i = randint(0, 24)
+                    y_i = randint(0, 15)
+                    
+                    if self.check_if_pos_is_unique(x_i, y_i):
+                        enem_tank = EnemyTank(x_i, y_i, 'up', 1, 1, chr(random_label)) # we should generate randomize labels infinitely to prevent bug in infinitely many tanks generation
+                        self.map_database[y_i][x_i] = enem_tank
+                        break
+
+                    random_label += 1
+
 
     def generate_static_bullet_pos(self):
         self.player_bullet_pos = (self.player_tank_pos[0], self.player_tank_pos[1], self.player_tank_pos[2])
@@ -87,7 +105,7 @@ class Game:
         return self.map_database[y][x] == 0
 
     # check tank hp, remove tank if hp == 0
-    def tankhp(self):
+    def eliminate_no_tankhp(self):
          for row in self.map_database:
              for tank in row:
                 if isinstance(tank, (Tank, EnemyTank)):
@@ -97,19 +115,9 @@ class Game:
                         self.map_database[destroyposrow][destroypos] = 0
 
     # main collision checker + entity movement function
-    def movement(self, direction: str, entity: str, x: int, y: int):
+    def movement(self, direction: Literal['left', 'right', 'up', 'down'], entity: Literal['player', 'bullet', 'enemy'], x: int, y: int):
         current_point = (x, y)
-        point = (0, 0)
-        dirvector: dict[str, tuple[int, int]] = {
-            'left': (x - 1, y),
-            'right': (x + 1, y),
-            'up': (x, y - 1),
-            'down': (x, y + 1)
-        }
-
-        # checks which input was made in order to use the correct dirvector tuple
-        if direction in dirvector:
-            point = dirvector[direction]
+        point = {'left': (x - 1, y), 'right': (x + 1, y), 'up': (x, y - 1), 'down': (x, y + 1)}.get(direction, (x, y))
 
         # bounds checking:
         if not (0 <= point[0] < self.screen_width//16) or not (0 <= point[1] < self.screen_height//16):
@@ -117,6 +125,10 @@ class Game:
             if entity == 'player':
                 entity_move = self.map_database[current_point[1]][current_point[0]] 
                 if isinstance(entity_move, Tank):
+                    entity_move.direction = direction
+            if entity == 'enemy':
+                entity_move = self.map_database[current_point[1]][current_point[0]] 
+                if isinstance(entity_move, EnemyTank):
                     entity_move.direction = direction
             if entity == 'bullet':
                 if type(self.map_database[current_point[1]][current_point[0]]) != Tank:
@@ -128,6 +140,10 @@ class Game:
             if entity == 'player':
                 entity_move = self.map_database[current_point[1]][current_point[0]] 
                 if isinstance(entity_move, Tank):
+                    entity_move.direction = direction
+            if entity == 'enemy':
+                entity_move = self.map_database[current_point[1]][current_point[0]] 
+                if isinstance(entity_move, EnemyTank):
                     entity_move.direction = direction
             print('YOU SHALL NOT PASS!!')
             # might need to refactor this code some time...
@@ -141,6 +157,10 @@ class Game:
             if entity == 'player':
                 entity_move = self.map_database[current_point[1]][current_point[0]] 
                 if isinstance(entity_move, Tank):
+                    entity_move.direction = direction
+            if entity == 'enemy':
+                entity_move = self.map_database[current_point[1]][current_point[0]] 
+                if isinstance(entity_move, EnemyTank):
                     entity_move.direction = direction
             if entity == 'bullet':
                 if type(self.map_database[current_point[1]][current_point[0]]) != Tank:
@@ -162,20 +182,41 @@ class Game:
                     self.map_database[current_point[1]][current_point[0]] = 0
 
             else:
-                self.map_database[point[1]][point[0]] = self.map_database[current_point[1]][current_point[0]]
+                if self.map_database[point[1]][point[0]] == 0:
+                    self.map_database[point[1]][point[0]] = self.map_database[current_point[1]][current_point[0]]
 
-                entity_move = self.map_database[point[1]][point[0]]
+                    entity_move = self.map_database[point[1]][point[0]]
 
-                if isinstance(entity_move, (Tank)):
-                    entity_move.x = point[0]
-                    entity_move.y = point[1]
-            
-                self.map_database[current_point[1]][current_point[0]] = 0
+                    if isinstance(entity_move, (Tank)):
+                        entity_move.x = point[0]
+                        entity_move.y = point[1]
 
-                if entity == 'player':
-                    self.player_tank_pos = (point[0], point[1], direction)
-                    if isinstance(entity_move, Tank):
-                        entity_move.direction = direction
+                    self.map_database[current_point[1]][current_point[0]] = 0
+
+                    if entity == 'player':
+                        self.player_tank_pos = (point[0], point[1], direction)
+                        if isinstance(entity_move, Tank):
+                            entity_move.direction = direction
+
+                    elif entity == 'enemy':
+                        if isinstance(entity_move, EnemyTank):
+                            entity_move.direction = direction
+                            print('next enemy move', entity_move)
+
+
+    def ai_tanks_moves(self):
+        directions = ['left', 'right', 'up', 'down']
+        for row in self.map_database:
+            for entity in row:
+                if isinstance(entity, EnemyTank):
+                    if entity.label not in self.visited_enemy_tanks_so_far: # Prevents the same tank from moving twice in one tick
+                        random_time_interval = randint(50, 100)
+                        if pyxel.frame_count % random_time_interval == 0:
+                            entity.direction = cast(Literal['left', 'right', 'up', 'down'], directions[randint(0, 3)])  # Set random direction
+                            self.movement(entity.direction, 'enemy', entity.x, entity.y)
+                            self.visited_enemy_tanks_so_far.add(entity.label)
+
+        self.visited_enemy_tanks_so_far.clear()
 
 
     def update(self):
@@ -205,7 +246,10 @@ class Game:
             if pyxel.frame_count % 4 == 0:
                 self.movement('down', 'player', self.player_tank_pos[0], self.player_tank_pos[1])
 
-        self.tankhp()
+
+        self.eliminate_no_tankhp()
+        
+        self.ai_tanks_moves()
 
         if pyxel.btnp(pyxel.KEY_SPACE) and not self.is_shoot_bullet:
             self.is_shoot_bullet = True
@@ -235,7 +279,14 @@ class Game:
                 elif type(entity) == Stone:
                     pyxel.blt(entity.x*16, entity.y*16, 0, 16, 16, 16, 16, 0)
                 elif type(entity) == EnemyTank:
-                    pyxel.blt(entity.x*16, entity.y*16, 0, 0, 32, 16, 16, 0)
+                    if entity.direction == 'up':
+                        pyxel.blt(entity.x*16, entity.y*16, 0, 0, 32, 16, 16, 0)
+                    elif entity.direction == 'down':
+                        pyxel.blt(entity.x*16, entity.y*16, 0, 16, 32, 16, 16, 0)
+                    elif entity.direction == 'right':
+                        pyxel.blt(entity.x*16, entity.y*16, 0, 32, 32, 16, 16, 0)
+                    elif entity.direction == 'left':
+                        pyxel.blt(entity.x*16, entity.y*16, 0, 48, 32, 16, 16, 0)
                 elif type(entity) == Bullet:
                     pyxel.blt(entity.x*16, entity.y*16, 0, 0, 16, 16, 16, 0)
 
