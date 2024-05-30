@@ -45,7 +45,7 @@ class Game:
         self.is_shoot_bullet = False
 
         self.num_stones: int = 10
-        self.num_tanks: int = 1
+        self.num_tanks: int = 5
 
         self.visited_enemy_tanks_so_far: set[str] = set() 
         self.visited_bullets_so_far: set[str] = set()
@@ -108,7 +108,7 @@ class Game:
          for row in self.map_database:
              for tank in row:
                 if isinstance(tank, (Tank, EnemyTank)):
-                    if tank.hp == 0:
+                    if tank.hp < 0:
                         destroyposrow = self.map_database.index(row)
                         destroypos = self.map_database[destroyposrow].index(tank)
                         self.map_database[destroyposrow][destroypos] = 0
@@ -117,9 +117,10 @@ class Game:
         for row in self.map_database:
             for bullet in row:
                 if isinstance(bullet, Bullet):
-                    if bullet.is_shoot:
-                        self.movement(bullet.direction, 'bullet', bullet.x, bullet.y, bullet)
-                        self.visited_bullets_so_far.add(bullet.label)
+                    if bullet.label not in self.visited_bullets_so_far:
+                        if bullet.is_shoot:
+                            self.movement(bullet.direction, 'bullet', bullet.x, bullet.y, bullet)
+                            self.visited_bullets_so_far.add(bullet.label)
         self.visited_bullets_so_far.clear()
 
     # main collision checker + entity movement function
@@ -235,7 +236,7 @@ class Game:
                             entity.direction = cast(Literal['left', 'right', 'up', 'down'], directions[randint(0, 3)])  # Set random direction
                             self.movement(entity.direction, 'enemy', entity.x, entity.y, entity)   
 
-                        random_time_interval_to_shoot = randint(3, 5)
+                        random_time_interval_to_shoot = randint(30, 50)
                         if pyxel.frame_count % random_time_interval_to_shoot == 0:
                             should_shoot = choice([True, False])     
                             if should_shoot and not entity.is_shoot:
@@ -244,8 +245,8 @@ class Game:
                                 entity.bullet.direction = entity.direction
                                 entity.is_shoot = True
 
-                            if entity.is_shoot:
-                                self.movement(entity.bullet.direction, 'bullet', entity.bullet.x, entity.bullet.y, entity)
+                        if entity.is_shoot:
+                            self.movement(entity.bullet.direction, 'bullet', entity.bullet.x, entity.bullet.y, entity)
                         
                         self.visited_enemy_tanks_so_far.add(entity.label)
 
@@ -284,7 +285,7 @@ class Game:
         
         self.ai_tanks_moves()
 
-        # self.keep_bullet_shooting() # this works i think
+        self.keep_bullet_shooting() # this works i think
 
 
         if pyxel.btnp(pyxel.KEY_SPACE) and not self.player_tank.is_shoot:
