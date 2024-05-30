@@ -42,24 +42,33 @@ class Game:
         self.screen_width = 400
         self.screen_height = 256
 
-        self.is_shoot_bullet = False
+        self.init_gamestate()
+        
+        pyxel.init(self.screen_width, self.screen_height, fps=60)
+        pyxel.load('assets/assets.pyxres')
+        pyxel.run(self.update, self.draw)
 
-        self.num_stones: int = 10
-        self.num_tanks: int = 5
+    # -- Generator Functions --
+    def init_gamestate(self):
+        self.is_gameover = False
+        self.is_win = False
+        self.undraw = False
+
+        self.map_database: list[list[Stone | Brick | Tank | EnemyTank | Bullet | int]] = [[0 for _ in range(self.screen_width // 16)] for _ in range(self.screen_height // 16)] # made this adaptable to screen size
+
+        self.num_stones: int = 10 # removed in phase 2
+        self.num_tanks: int = 5 # removed in phase 2 (?)
+        self.rem_tanks = self.num_tanks # this has to be updated every time a new tank spawns in too
 
         self.visited_enemy_tanks_so_far: set[str] = set() 
         self.visited_bullets_so_far: set[str] = set()
 
-        pyxel.init(self.screen_width, self.screen_height, fps=60)
+        self.is_shoot_bullet = False
 
         self.generate_player_tank()
         self.generate_stone_cells()
         self.generate_enem_tank()
 
-        pyxel.load('assets/assets.pyxres')
-        pyxel.run(self.update, self.draw)
-
-    # -- Generator Functions --
     # Main priority in generation is to ensure that the tanks and stones do not overlap each other
     def generate_stone_cells(self):
         for _ in range(self.num_stones):
@@ -105,14 +114,27 @@ class Game:
 
     # check tank hp, remove tank if hp == 0
     def eliminate_no_tankhp(self):
-         for row in self.map_database:
-             for tank in row:
+        for row in self.map_database:
+            for tank in row:
                 if isinstance(tank, (Tank, EnemyTank)):
-                    if tank.hp < 0:
+                    if tank.hp <= 0:
                         destroyposrow = self.map_database.index(row)
                         destroypos = self.map_database[destroyposrow].index(tank)
                         self.map_database[destroyposrow][destroypos] = 0
 
+                        if type(tank) == Tank and tank.hp == 0:
+                            self.is_gameover = True
+                            self.frames = pyxel.frame_count + 180
+                        else:
+                            self.rem_tanks -= 1
+                            print(self.rem_tanks)
+
+    def check_rem_tanks(self):
+        if self.rem_tanks == 0 and not self.is_win:
+            self.is_win = True
+            self.frames = pyxel.frame_count + 180
+
+    # check if bullet is still in the game, if it is, keep it moving
     def keep_bullet_shooting(self):
         for row in self.map_database:
             for bullet in row:
@@ -165,7 +187,7 @@ class Game:
                     self.map_database[current_point[1]][current_point[0]] = 0
                 is_from.is_shoot = False
 
-        elif isinstance(self.map_database[point[1]][point[0]], EnemyTank):
+        elif isinstance(self.map_database[point[1]][point[0]], (EnemyTank, Tank)):
             print('YOU SHALL NOT PASS!!, enem')
             if entity == 'player':
                 entity_move = self.map_database[current_point[1]][current_point[0]] 
@@ -182,7 +204,7 @@ class Game:
                     self.map_database[current_point[1]][current_point[0]] = 0
                 is_from.is_shoot = False
                 chk_entity = self.map_database[point[1]][point[0]]
-                if isinstance(chk_entity, (EnemyTank)):
+                if isinstance(chk_entity, (Tank, EnemyTank)):
                     chk_entity.hp -= 1
 
         # reflect changes into map_database
@@ -254,80 +276,104 @@ class Game:
 
 
     def update(self):
-        if pyxel.btnp(pyxel.KEY_Q):
-            pyxel.quit()
-        
-        if pyxel.btnp(pyxel.KEY_T): # debug key, checks map state mid-game
-            print(self.map_database)
+        if self.is_gameover or self.is_win:
+            if pyxel.frame_count > self.frames:
+                self.undraw = True
 
-        if pyxel.btn(pyxel.KEY_LEFT):
-            print('left pressed!', self.player_tank)
-            if pyxel.frame_count % 4 == 0:
-                self.movement('left', 'player', self.player_tank.x, self.player_tank.y, self.player_tank)
+            if pyxel.btnp(pyxel.KEY_R):
+                self.init_gamestate()
 
-        elif pyxel.btn(pyxel.KEY_RIGHT):
-            print('right pressed!', self.player_tank)
-            if pyxel.frame_count % 4 == 0:
-                self.movement('right', 'player', self.player_tank.x, self.player_tank.y, self.player_tank)
+        if not self.undraw:
+            if pyxel.btnp(pyxel.KEY_Q):
+                pyxel.quit()
 
-        elif pyxel.btn(pyxel.KEY_UP):
-            print('up pressed!', self.player_tank)
-            if pyxel.frame_count % 4 == 0:
-                self.movement('up', 'player', self.player_tank.x, self.player_tank.y, self.player_tank)
+            if pyxel.btnp(pyxel.KEY_F1): # debug key, instant game over
+                print(self.map_database[self.player_tank.y][self.player_tank.x])
+                tanko = self.map_database[self.player_tank.y][self.player_tank.x]
+                print('BOOM', tanko)
+                if isinstance(tanko, Tank):
+                    tanko.hp = 0
+            
+            if pyxel.btnp(pyxel.KEY_T): # debug key, checks map state mid-game
+                print(self.map_database)
 
-        elif pyxel.btn(pyxel.KEY_DOWN):
-            print('down pressed!', self.player_tank)
-            if pyxel.frame_count % 4 == 0:
-                self.movement('down', 'player', self.player_tank.x, self.player_tank.y, self.player_tank)
+            if self.player_tank.hp > 0: # don't move if player tank dead already
+                if pyxel.btn(pyxel.KEY_LEFT):
+                    print('left pressed!', self.player_tank)
+                    if pyxel.frame_count % 4 == 0:
+                        self.movement('left', 'player', self.player_tank.x, self.player_tank.y, self.player_tank)
+
+                elif pyxel.btn(pyxel.KEY_RIGHT):
+                    print('right pressed!', self.player_tank)
+                    if pyxel.frame_count % 4 == 0:
+                        self.movement('right', 'player', self.player_tank.x, self.player_tank.y, self.player_tank)
+
+                elif pyxel.btn(pyxel.KEY_UP):
+                    print('up pressed!', self.player_tank)
+                    if pyxel.frame_count % 4 == 0:
+                        self.movement('up', 'player', self.player_tank.x, self.player_tank.y, self.player_tank)
+
+                elif pyxel.btn(pyxel.KEY_DOWN):
+                    print('down pressed!', self.player_tank)
+                    if pyxel.frame_count % 4 == 0:
+                        self.movement('down', 'player', self.player_tank.x, self.player_tank.y, self.player_tank)
 
 
-        self.eliminate_no_tankhp()
-        
-        self.ai_tanks_moves()
+            self.eliminate_no_tankhp()
+            
+            self.ai_tanks_moves()
 
-        self.keep_bullet_shooting() # this works i think
+            self.keep_bullet_shooting() # this works i think
+
+            self.check_rem_tanks()
 
 
-        if pyxel.btnp(pyxel.KEY_SPACE) and not self.player_tank.is_shoot:
-            self.player_tank.bullet.x = self.player_tank.x
-            self.player_tank.bullet.y = self.player_tank.y
-            self.player_tank.bullet.direction = self.player_tank.direction
-            self.player_tank.is_shoot = True
+            if pyxel.btnp(pyxel.KEY_SPACE) and not self.player_tank.is_shoot:
+                self.player_tank.bullet.x = self.player_tank.x
+                self.player_tank.bullet.y = self.player_tank.y
+                self.player_tank.bullet.direction = self.player_tank.direction
+                self.player_tank.is_shoot = True
 
-        if self.player_tank.is_shoot:
-            print('shooting!', self.player_tank)
-            self.movement(self.player_tank.bullet.direction, 'bullet', self.player_tank.bullet.x, self.player_tank.bullet.y, self.player_tank)
-        
+            if self.player_tank.is_shoot:
+                print('shooting!', self.player_tank)
+                self.movement(self.player_tank.bullet.direction, 'bullet', self.player_tank.bullet.x, self.player_tank.bullet.y, self.player_tank)
+    
 
 
     def draw(self):
         pyxel.cls(4)
 
-        #generate graphics based on map_database
-        for row in self.map_database:
-            for entity in row:
-                if type(entity) == Tank:
-                    if entity.direction == 'up':
-                        pyxel.blt(entity.x*16, entity.y*16, 0, 0, 0, 16, 16, 0)
-                    elif entity.direction == 'down':
-                        pyxel.blt(entity.x*16, entity.y*16, 0, 16, 0, 16, 16, 0)
-                    elif entity.direction == 'right':
-                        pyxel.blt(entity.x*16, entity.y*16, 0, 32, 0, 16, 16, 0)
-                    elif entity.direction == 'left':
-                        pyxel.blt(entity.x*16, entity.y*16, 0, 48, 0, 16, 16, 0)
-                elif type(entity) == Stone:
-                    pyxel.blt(entity.x*16, entity.y*16, 0, 16, 16, 16, 16, 0)
-                elif type(entity) == EnemyTank:
-                    if entity.direction == 'up':
-                        pyxel.blt(entity.x*16, entity.y*16, 0, 0, 32, 16, 16, 0)
-                    elif entity.direction == 'down':
-                        pyxel.blt(entity.x*16, entity.y*16, 0, 16, 32, 16, 16, 0)
-                    elif entity.direction == 'right':
-                        pyxel.blt(entity.x*16, entity.y*16, 0, 32, 32, 16, 16, 0)
-                    elif entity.direction == 'left':
-                        pyxel.blt(entity.x*16, entity.y*16, 0, 48, 32, 16, 16, 0)
-                elif type(entity) == Bullet:
-                    pyxel.blt(entity.x*16, entity.y*16, 0, 0, 16, 16, 16, 0)
+        if not self.undraw:
+            #generate graphics based on map_database
+            for row in self.map_database:
+                for entity in row:
+                    if type(entity) == Tank:
+                        if entity.direction == 'up':
+                            pyxel.blt(entity.x*16, entity.y*16, 0, 0, 0, 16, 16, 0)
+                        elif entity.direction == 'down':
+                            pyxel.blt(entity.x*16, entity.y*16, 0, 16, 0, 16, 16, 0)
+                        elif entity.direction == 'right':
+                            pyxel.blt(entity.x*16, entity.y*16, 0, 32, 0, 16, 16, 0)
+                        elif entity.direction == 'left':
+                            pyxel.blt(entity.x*16, entity.y*16, 0, 48, 0, 16, 16, 0)
+                    elif type(entity) == Stone:
+                        pyxel.blt(entity.x*16, entity.y*16, 0, 16, 16, 16, 16, 0)
+                    elif type(entity) == EnemyTank:
+                        if entity.direction == 'up':
+                            pyxel.blt(entity.x*16, entity.y*16, 0, 0, 32, 16, 16, 0)
+                        elif entity.direction == 'down':
+                            pyxel.blt(entity.x*16, entity.y*16, 0, 16, 32, 16, 16, 0)
+                        elif entity.direction == 'right':
+                            pyxel.blt(entity.x*16, entity.y*16, 0, 32, 32, 16, 16, 0)
+                        elif entity.direction == 'left':
+                            pyxel.blt(entity.x*16, entity.y*16, 0, 48, 32, 16, 16, 0)
+                    elif type(entity) == Bullet:
+                        pyxel.blt(entity.x*16, entity.y*16, 0, 0, 16, 16, 16, 0)
+        else:
+            if self.is_gameover:
+                pyxel.text((self.screen_width // 2) - 20, (self.screen_height // 2) - 20, 'GAME OVER', 1) # temporary values. might have to make a game over splash screen instead since the text is small
+            elif self.is_win:
+                pyxel.text((self.screen_width // 2) - 20, (self.screen_height // 2) - 20, 'YOU WIN!', 1) 
 
 
                 
