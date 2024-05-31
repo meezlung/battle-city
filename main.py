@@ -50,7 +50,7 @@ class Game:
         
         pyxel.run(self.update, self.draw)
 
-    # -- Generator Functions --
+# ------- Generator Functions -------
     def init_gamestate(self):
         self.is_gameover = False
         self.is_win = False
@@ -67,7 +67,7 @@ class Game:
 
         self.is_shoot_bullet = False
 
-        pyxel.playm(0, loop=True)
+        # pyxel.playm(0, loop=True)
 
         self.generate_player_tank()
         self.generate_stone_cells()
@@ -109,14 +109,13 @@ class Game:
                         break
 
                     random_label += 1
+# ------- End of Generator Functions -------
 
-    # -- End of Generator Functions --
-
-
+# ------- Helper Functions -------
     def check_if_pos_is_unique(self, x: int, y: int) -> bool:
         return self.map_database[y][x] == 0
 
-    # check tank hp, remove tank if hp == 0
+    # Check tank hp, remove tank if hp == 0
     def eliminate_no_tankhp(self):
         for row in self.map_database:
             for tank in row:
@@ -138,7 +137,7 @@ class Game:
             self.is_win = True
             self.frames = pyxel.frame_count + 180
 
-    # check if bullet is still in the game, if it is, keep it moving
+    # Check if bullet is still in the game, if it is, keep it moving
     def keep_bullet_shooting(self):
         for row in self.map_database:
             for bullet in row:
@@ -150,106 +149,84 @@ class Game:
                                 self.visited_bullets_so_far.add(bullet.label)
         self.visited_bullets_so_far.clear()
 
-    # main collision checker + entity movement function
-    def movement(self, direction: Literal['left', 'right', 'up', 'down'], entity: Literal['player', 'bullet', 'enemy'], x: int, y: int, is_from: Tank | EnemyTank | Bullet):
-        current_point = (x, y)
-        point = {'left': (x - 1, y), 'right': (x + 1, y), 'up': (x, y - 1), 'down': (x, y + 1)}.get(direction, (x, y))
+    def get_new_points(self, x: int, y: int, direction: Literal['left', 'right', 'up', 'down']) -> tuple[int, int]:
+        return {'left': (x - 1, y), 'right': (x + 1, y), 'up': (x, y - 1), 'down': (x, y + 1)}.get(direction, (x, y))
 
-        # bounds checking:
-        if not (0 <= point[0] < self.screen_width//16) or not (0 <= point[1] < self.screen_height//16):
-            print('YOU SHALL NOT PASS!!, wall', current_point)
-            if entity == 'player':
-                entity_move = self.map_database[current_point[1]][current_point[0]] 
-                if isinstance(entity_move, Tank):
-                    entity_move.direction = direction
-                    entity_move.bullet.direction = direction
-            if entity == 'enemy':
-                entity_move = self.map_database[current_point[1]][current_point[0]] 
-                if isinstance(entity_move, EnemyTank):
-                    entity_move.direction = direction
-                    entity_move.bullet.direction = direction
-            if entity == 'bullet':
-                if type(self.map_database[current_point[1]][current_point[0]]) not in (Tank, EnemyTank):
-                    self.map_database[current_point[1]][current_point[0]] = 0
-                is_from.is_shoot = False
+    def change_direction_of_entity(self, direction: Literal['left', 'right', 'up', 'down'], entity_move: Tank | EnemyTank | Bullet):
+        entity_move.direction = direction
 
-        # check if there is an entity ahead of the entity trying to move, if there is one, do not move
-        elif isinstance(self.map_database[point[1]][point[0]], Stone):
-            if entity == 'player':
-                entity_move = self.map_database[current_point[1]][current_point[0]] 
-                if isinstance(entity_move, Tank):
-                    entity_move.direction = direction
-                    entity_move.bullet.direction = direction
-            if entity == 'enemy':
-                entity_move = self.map_database[current_point[1]][current_point[0]] 
-                if isinstance(entity_move, EnemyTank):
-                    entity_move.direction = direction
-                    entity_move.bullet.direction = direction
-            print('YOU SHALL NOT PASS!!, stone')
-            # might need to refactor this code some time...
-            if entity == 'bullet':
-                if type(self.map_database[current_point[1]][current_point[0]]) not in (Tank, EnemyTank):
-                    self.map_database[current_point[1]][current_point[0]] = 0
-                is_from.is_shoot = False
+    def handle_collision(self, direction: Literal['left', 'right', 'up', 'down'], entity: Literal['player', 'bullet', 'enemy'], x: int, y: int, is_from: Tank | EnemyTank | Bullet):
+        entity_move = self.map_database[y][x]
 
-        elif isinstance(self.map_database[point[1]][point[0]], (EnemyTank, Tank)):
-            print('YOU SHALL NOT PASS!!, enem')
-            if entity == 'player':
-                entity_move = self.map_database[current_point[1]][current_point[0]] 
-                if isinstance(entity_move, Tank):
-                    entity_move.direction = direction
-                    entity_move.bullet.direction = direction
-            if entity == 'enemy':
-                entity_move = self.map_database[current_point[1]][current_point[0]] 
-                if isinstance(entity_move, EnemyTank):
-                    entity_move.direction = direction
-                    entity_move.bullet.direction = direction
-            if entity == 'bullet':
-                if type(self.map_database[current_point[1]][current_point[0]]) not in (Tank, EnemyTank):
-                    self.map_database[current_point[1]][current_point[0]] = 0
-                is_from.is_shoot = False
-                chk_entity = self.map_database[point[1]][point[0]]
-                if isinstance(chk_entity, (Tank, EnemyTank)):
-                    chk_entity.hp -= 1
+        if entity == 'player' and isinstance(entity_move, Tank):
+            self.change_direction_of_entity(direction, entity_move)
 
-        # reflect changes into map_database
+        elif entity == 'enemy' and isinstance(entity_move, EnemyTank):
+            self.change_direction_of_entity(direction, entity_move)
+
+        elif entity == 'bullet':
+            if not isinstance(entity_move, (Tank, EnemyTank)):
+                self.map_database[y][x] = 0
+
+            is_from.is_shoot = False # to keep the bullet moving/recursing from a tank or enemy tank
+
+    def handle_bullet_damage(self, new_x: int, new_y: int):
+        entity_on_new_point = self.map_database[new_y][new_x]
+        if isinstance(entity_on_new_point, (Tank, EnemyTank)):
+            entity_on_new_point.hp -= 1
+
+    def move_bullet(self, direction: Literal['left', 'right', 'up', 'down'], curr_x: int, curr_y: int, new_x: int, new_y: int, is_from: Tank | EnemyTank | Bullet):
+        if isinstance(is_from, (Tank, EnemyTank)):
+            self.map_database[new_y][new_x] = Bullet(new_x, new_y, direction, True, is_from.bullet.label)
+            is_from.bullet.x, is_from.bullet.y, is_from.bullet.direction = (new_x, new_y, direction)
+        
+        if isinstance(is_from, Bullet):
+            self.map_database[new_y][new_x] = Bullet(new_x, new_y, direction, True, is_from.label)
+            is_from.x, is_from.y, is_from.direction = (new_x, new_y, direction)
+
+        # Edge case: If the bullet just spawned, this will prevent setting the tank to 0
+        if isinstance(self.map_database[curr_y][curr_x], Bullet):
+            self.map_database[curr_y][curr_x] = 0
+
+    def move_tanks(self, direction: Literal['left', 'right', 'up', 'down'], entity: Literal['player', 'enemy'], curr_x: int, curr_y: int, new_x: int, new_y: int):
+        # If the new point is safe to move into, move the entity to the new point
+        if self.map_database[new_y][new_x] == 0: 
+            self.map_database[new_y][new_x] = self.map_database[curr_y][curr_x]
+            entity_move = self.map_database[new_y][new_x]
+
+            self.map_database[curr_y][curr_x] = 0
+
+            if entity == 'player' or entity == 'enemy':
+                if isinstance(entity_move, (Tank, EnemyTank)):
+                    entity_move.x, entity_move.y, entity_move.direction = new_x, new_y, direction
+# ------- Helper Functions -------
+
+# ------- Main collision checker + Entity movement function -------
+    def movement(self, direction: Literal['left', 'right', 'up', 'down'], entity: Literal['player', 'bullet', 'enemy'], curr_x: int, curr_y: int, is_from: Tank | EnemyTank | Bullet):
+        new_x, new_y = self.get_new_points(curr_x, curr_y, direction)
+        
+        # Bounds checking
+        if not (0 <= new_x < self.screen_width // 16) or not (0 <= new_y < self.screen_height // 16):
+            self.handle_collision(direction, entity, curr_x, curr_y, is_from)
+
+        # Check if there is an entity ahead of the entity trying to move, if there is one, do not move
+        elif isinstance(self.map_database[new_y][new_x], Stone):
+            self.handle_collision(direction, entity, curr_x, curr_y, is_from)
+
+        elif isinstance(self.map_database[new_y][new_x], (EnemyTank, Tank)):
+            self.handle_collision(direction, entity, curr_x, curr_y, is_from)
+            if entity == 'bullet': # Bullet finds a tank, tank takes damage
+                self.handle_bullet_damage(new_x, new_y) 
+
+        # Reflect changes into map_database
         else:
-            # a bullet generates differently than any other entity, thus it must be treated as a separate case
+            # A bullet generates differently than any other entity, thus it must be treated as a separate case
             if entity == 'bullet': 
-                if isinstance(is_from, (Tank, EnemyTank)):
-                    self.map_database[point[1]][point[0]] = Bullet(point[0], point[1], direction, True, is_from.bullet.label)
-                    is_from.bullet.x, is_from.bullet.y, is_from.bullet.direction = (point[0], point[1], direction)
-                
-                if isinstance(is_from, Bullet):
-                    self.map_database[point[1]][point[0]] = Bullet(point[0], point[1], direction, True, is_from.label)
-                    is_from.x, is_from.y, is_from.direction = (point[0], point[1], direction)
-
-                # edge case - if the bullet just spawned, this will prevent setting the tank to 0
-                if isinstance(self.map_database[current_point[1]][current_point[0]], Bullet):
-                    self.map_database[current_point[1]][current_point[0]] = 0
+                self.move_bullet(direction, curr_x, curr_y, new_x, new_y, is_from)
 
             else:
-                if self.map_database[point[1]][point[0]] == 0:
-                    self.map_database[point[1]][point[0]] = self.map_database[current_point[1]][current_point[0]]
-
-                    entity_move = self.map_database[point[1]][point[0]]
-
-                    self.map_database[current_point[1]][current_point[0]] = 0
-
-                    if entity == 'player':
-                        self.player_tank_pos = (point[0], point[1], direction)
-                        if isinstance(entity_move, Tank):
-                            entity_move.x = point[0]
-                            entity_move.y = point[1]
-                            entity_move.direction = direction
-
-                    elif entity == 'enemy':
-                        if isinstance(entity_move, EnemyTank):
-                            entity_move.x = point[0]
-                            entity_move.y = point[1]
-                            entity_move.direction = direction
-
-                            print('next enemy move', entity_move)
+                self.move_tanks(direction, entity, curr_x, curr_y, new_x, new_y)
+# -- Main collision checker + Entity movement function --
 
 
     def ai_tanks_moves(self):
@@ -267,9 +244,7 @@ class Game:
                         if pyxel.frame_count % random_time_interval_to_shoot == 0:
                             should_shoot = choice([True, False])     
                             if should_shoot and not entity.is_shoot:
-                                entity.bullet.x = entity.x
-                                entity.bullet.y = entity.y
-                                entity.bullet.direction = entity.direction
+                                entity.bullet.x, entity.bullet.y, entity.bullet.direction = entity.x, entity.y, entity.direction
                                 entity.is_shoot = True
 
                         if entity.is_shoot:
@@ -279,6 +254,7 @@ class Game:
                         self.visited_enemy_tanks_so_far.add(entity.label)
 
         self.visited_enemy_tanks_so_far.clear()
+
 
 
     def update(self):
@@ -326,9 +302,7 @@ class Game:
                         self.movement('down', 'player', self.player_tank.x, self.player_tank.y, self.player_tank)
                 
                 if pyxel.btnp(pyxel.KEY_SPACE) and not self.player_tank.is_shoot:
-                    self.player_tank.bullet.x = self.player_tank.x
-                    self.player_tank.bullet.y = self.player_tank.y
-                    self.player_tank.bullet.direction = self.player_tank.direction
+                    self.player_tank.bullet.x, self.player_tank.bullet.y, self.player_tank.bullet.direction = self.player_tank.x, self.player_tank.y, self.player_tank.direction
                     self.player_tank.is_shoot = True
 
                 if self.player_tank.is_shoot:
@@ -339,11 +313,9 @@ class Game:
             
             self.ai_tanks_moves()
 
-            self.keep_bullet_shooting() # this works i think
+            self.keep_bullet_shooting()
 
             self.check_rem_tanks()
-
-
 
 
 
