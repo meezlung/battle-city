@@ -42,10 +42,12 @@ class Game:
         self.screen_width = 400
         self.screen_height = 256
 
-        self.init_gamestate()
         
         pyxel.init(self.screen_width, self.screen_height, fps=60)
         pyxel.load('assets/assets.pyxres')
+
+        self.init_gamestate() # para maplay music even after gameover
+        
         pyxel.run(self.update, self.draw)
 
     # -- Generator Functions --
@@ -64,6 +66,8 @@ class Game:
         self.visited_bullets_so_far: set[str] = set()
 
         self.is_shoot_bullet = False
+
+        pyxel.playm(0, loop=True)
 
         self.generate_player_tank()
         self.generate_stone_cells()
@@ -141,8 +145,9 @@ class Game:
                 if isinstance(bullet, Bullet):
                     if bullet.label not in self.visited_bullets_so_far:
                         if bullet.is_shoot:
-                            self.movement(bullet.direction, 'bullet', bullet.x, bullet.y, bullet)
-                            self.visited_bullets_so_far.add(bullet.label)
+                            if pyxel.frame_count % 5 == 0:
+                                self.movement(bullet.direction, 'bullet', bullet.x, bullet.y, bullet)
+                                self.visited_bullets_so_far.add(bullet.label)
         self.visited_bullets_so_far.clear()
 
     # main collision checker + entity movement function
@@ -268,7 +273,8 @@ class Game:
                                 entity.is_shoot = True
 
                         if entity.is_shoot:
-                            self.movement(entity.bullet.direction, 'bullet', entity.bullet.x, entity.bullet.y, entity)
+                            if pyxel.frame_count % 5 == 0:
+                                self.movement(entity.bullet.direction, 'bullet', entity.bullet.x, entity.bullet.y, entity)
                         
                         self.visited_enemy_tanks_so_far.add(entity.label)
 
@@ -279,6 +285,7 @@ class Game:
         if self.is_gameover or self.is_win:
             if pyxel.frame_count > self.frames:
                 self.undraw = True
+                pyxel.stop() # stop music
 
             if pyxel.btnp(pyxel.KEY_R):
                 self.init_gamestate()
@@ -317,8 +324,17 @@ class Game:
                     print('down pressed!', self.player_tank)
                     if pyxel.frame_count % 4 == 0:
                         self.movement('down', 'player', self.player_tank.x, self.player_tank.y, self.player_tank)
+                
+                if pyxel.btnp(pyxel.KEY_SPACE) and not self.player_tank.is_shoot:
+                    self.player_tank.bullet.x = self.player_tank.x
+                    self.player_tank.bullet.y = self.player_tank.y
+                    self.player_tank.bullet.direction = self.player_tank.direction
+                    self.player_tank.is_shoot = True
 
-
+                if self.player_tank.is_shoot:
+                    print('shooting!', self.player_tank)
+                    self.movement(self.player_tank.bullet.direction, 'bullet', self.player_tank.bullet.x, self.player_tank.bullet.y, self.player_tank)
+    
             self.eliminate_no_tankhp()
             
             self.ai_tanks_moves()
@@ -328,16 +344,7 @@ class Game:
             self.check_rem_tanks()
 
 
-            if pyxel.btnp(pyxel.KEY_SPACE) and not self.player_tank.is_shoot:
-                self.player_tank.bullet.x = self.player_tank.x
-                self.player_tank.bullet.y = self.player_tank.y
-                self.player_tank.bullet.direction = self.player_tank.direction
-                self.player_tank.is_shoot = True
 
-            if self.player_tank.is_shoot:
-                print('shooting!', self.player_tank)
-                self.movement(self.player_tank.bullet.direction, 'bullet', self.player_tank.bullet.x, self.player_tank.bullet.y, self.player_tank)
-    
 
 
     def draw(self):
