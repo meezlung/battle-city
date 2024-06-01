@@ -165,6 +165,14 @@ class Game:
                                     self.visited_bullets_so_far.add(bullet.label)
         self.visited_bullets_so_far.clear()
 
+    def stop_shooting_if_bullet_collided_with_each_other(self, bullet1: Bullet, bullet2: Bullet):
+        for row in self.map_database:
+            for tank in row:
+                if type(tank) == EnemyTank:
+                    if bullet1.label == tank.label or bullet2.label == tank.label:
+                        tank.bullet.is_shoot = False
+                        tank.is_shoot = False
+
     def get_new_points(self, x: int, y: int, direction: Literal['left', 'right', 'up', 'down']) -> tuple[int, int]:
         return {'left': (x - 1, y), 'right': (x + 1, y), 'up': (x, y - 1), 'down': (x, y + 1)}.get(direction, (x, y))
 
@@ -185,6 +193,34 @@ class Game:
                 self.map_database[curr_y][curr_x] = 0
 
             is_from.is_shoot = False # to keep the bullet moving/recursing from a tank or enemy tank
+
+    def handle_bullet_to_bullet_collision(self, new_x: int, new_y: int, curr_x: int, curr_y: int):
+        bullet1 = self.map_database[new_y][new_x]
+        bullet2 = self.map_database[curr_y][curr_x]
+
+        if type(bullet1) == type(bullet2) and isinstance(bullet1, Bullet) and isinstance(bullet2, Bullet):
+            print("Bullet collision happened", bullet1, bullet2)      
+
+            bullet1.is_shoot = False
+            bullet2.is_shoot = False
+
+            if bullet1.label == 'player' or bullet2.label == 'player': # If one of them is the player
+                # Note: Same logic as when a bullet hits a stone
+
+                # Stop player from shooting again first
+                self.player_tank.bullet.is_shoot = False
+                self.player_tank.is_shoot = False
+
+                # Stop enemy tank from shooting again first
+                self.stop_shooting_if_bullet_collided_with_each_other(bullet1, bullet2)
+                
+            else: # If both are enemy tanks (Proof by De Morgan's Law)
+                # Stop both enemy tanks from shooting again first
+                self.stop_shooting_if_bullet_collided_with_each_other(bullet1, bullet2)
+
+            self.map_database[new_y][new_x] = 0
+            self.map_database[curr_y][curr_x] = 0
+            return
 
     def handle_bullet_damage(self, new_x: int, new_y: int, is_from: Bullet | Tank | EnemyTank): # I can shorten this pa, but I just want to see each test cases
         entity_on_new_point = self.map_database[new_y][new_x]
@@ -273,10 +309,15 @@ class Game:
             if entity == 'bullet': # Bullet finds a tank, tank takes damage
                 self.handle_bullet_damage(new_x, new_y, is_from) 
 
+        elif isinstance(self.map_database[new_y][new_x], Bullet):
+            if entity == 'bullet': # Bullet finds another bullet, both bullets should disappear
+                self.handle_bullet_to_bullet_collision(new_x, new_y, curr_x, curr_y) 
+
         # Reflect changes into map_database
         else:
             # A bullet generates differently than any other entity, thus it must be treated as a separate case
             if entity == 'bullet': 
+                print('Bullet moving')
                 self.move_bullet(direction, curr_x, curr_y, new_x, new_y, is_from)
 
             else:
@@ -302,8 +343,9 @@ class Game:
                                 if should_shoot and not entity.is_shoot:
                                     entity.bullet.x, entity.bullet.y, entity.bullet.direction = entity.x, entity.y, entity.direction
                                     entity.is_shoot = True
+                                    entity.bullet.is_shoot = True
 
-                            if entity.is_shoot:
+                            if entity.is_shoot and entity.bullet.is_shoot:
                                 if pyxel.frame_count % 5 == 0:
                                     self.movement(entity.bullet.direction, 'bullet', entity.bullet.x, entity.bullet.y, entity)
                         
@@ -359,8 +401,9 @@ class Game:
                 if pyxel.btnp(pyxel.KEY_SPACE) and not self.player_tank.is_shoot and pyxel.frame_count > self.frames_before_starting: #  # Uncomment this later. This prevents the player from shooting before the game starts
                     self.player_tank.bullet.x, self.player_tank.bullet.y, self.player_tank.bullet.direction = self.player_tank.x, self.player_tank.y, self.player_tank.direction
                     self.player_tank.is_shoot = True
+                    self.player_tank.bullet.is_shoot = True
 
-                if self.player_tank.is_shoot:
+                if self.player_tank.is_shoot and self.player_tank.bullet.is_shoot:
                     self.movement(self.player_tank.bullet.direction, 'bullet', self.player_tank.bullet.x, self.player_tank.bullet.y, self.player_tank)
     
             self.eliminate_no_tankhp()
