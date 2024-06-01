@@ -43,10 +43,8 @@ class Mirror:
 
 class Game:
     def __init__(self):
-
         self.screen_width = 400
         self.screen_height = 256
-
         
         pyxel.init(self.screen_width, self.screen_height, fps=60)
         pyxel.load('assets/assets.pyxres')
@@ -66,7 +64,7 @@ class Game:
 
         self.num_stones: int = 10 # removed in phase 2
         self.num_mirrors: int = 5 # removed in phase 2
-        self.num_tanks: int = 1
+        self.num_tanks: int = 5 # removed in phase 2 (?)
         self.rem_tanks = self.num_tanks # this has to be updated every time a new tank spawns in too
 
         self.visited_enemy_tanks_so_far: set[str] = set() 
@@ -74,13 +72,12 @@ class Game:
 
         self.is_shoot_bullet = False
 
-        #pyxel.playm(0, loop=True) # :3
+        # pyxel.playm(0, loop=True) # :3 
 
         self.generate_player_tank()
         self.generate_stone_cells()
         self.generate_mirrors()
         self.generate_enem_tank()
-        
 
     # Main priority in generation is to ensure that the tanks and stones do not overlap each other
     def generate_stone_cells(self):
@@ -91,6 +88,7 @@ class Game:
             if self.check_if_pos_is_unique(x_i, y_i):
                 stone = Stone(x_i, y_i)
                 self.map_database[y_i][x_i] = stone
+
     def generate_mirrors(self):
         for _ in range(self.num_mirrors):
             x_i = randint(0, 24)
@@ -195,13 +193,12 @@ class Game:
 
     def get_new_points(self, x: int, y: int, direction: Literal['left', 'right', 'up', 'down']) -> tuple[int, int]:
         return {'left': (x - 1, y), 'right': (x + 1, y), 'up': (x, y - 1), 'down': (x, y + 1)}.get(direction, (x, y))
-    
+
     def get_mirror_points(self, x: int, y: int, direction: Literal['left', 'right', 'up', 'down'], orient: Literal['NE', 'SE']) -> tuple[int, int, Literal['left', 'right', 'up', 'down']]:
         if orient == 'NE':
             return {'left': (x - 1, y + 1, 'down'), 'right': (x + 1, y - 1, 'up'), 'up': (x + 1, y - 1, 'right'), 'down': (x - 1, y + 1, 'left')}.get(direction, (x, y, 'left'))
         else:
             return {'left': (x - 1, y - 1, 'up'), 'right': (x + 1, y + 1, 'down'), 'up': (x - 1, y - 1, 'left'), 'down': (x + 1, y + 1, 'right')}.get(direction, (x, y, 'left'))
-        ...
 
     def change_direction_of_entity(self, direction: Literal['left', 'right', 'up', 'down'], entity_move: Tank | EnemyTank | Bullet):
         entity_move.direction = direction
@@ -230,6 +227,7 @@ class Game:
 
             bullet1.is_shoot = False
             bullet2.is_shoot = False
+            print('Suspect')
 
             if bullet1.label == 'player' or bullet2.label == 'player': # If one of them is the player
                 # Note: Same logic as when a bullet hits a stone
@@ -295,8 +293,8 @@ class Game:
 
     def move_bullet(self, direction: Literal['left', 'right', 'up', 'down'], curr_x: int, curr_y: int, new_x: int, new_y: int, is_from: Tank | EnemyTank | Bullet):
         if isinstance(is_from, (Tank, EnemyTank)):
-                self.map_database[new_y][new_x] = Bullet(new_x, new_y, direction, True, is_from.bullet.label)
-                is_from.bullet.x, is_from.bullet.y, is_from.bullet.direction = (new_x, new_y, direction)
+            self.map_database[new_y][new_x] = Bullet(new_x, new_y, direction, True, is_from.bullet.label)
+            is_from.bullet.x, is_from.bullet.y, is_from.bullet.direction = (new_x, new_y, direction)
         
         if isinstance(is_from, Bullet):
             self.map_database[new_y][new_x] = Bullet(new_x, new_y, direction, True, is_from.label)
@@ -331,9 +329,10 @@ class Game:
         elif isinstance(self.map_database[new_y][new_x], Stone):
             self.handle_collision(direction, entity, curr_x, curr_y, is_from)
 
-        #if entity ahead is a mirror, separate collision check
+        # If entity ahead is a mirror, separate collision check
         elif entity == 'bullet' and isinstance(self.map_database[new_y][new_x], Mirror):
             mirror = self.map_database[new_y][new_x]
+            print('Mirror!', mirror)
             if isinstance(mirror, (Mirror)):
                 orient = mirror.orientation
                 mir_x, mir_y, mir_dir = self.get_mirror_points(curr_x, curr_y, direction, orient)
