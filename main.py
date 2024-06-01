@@ -55,6 +55,7 @@ class Game:
         self.is_gameover = False
         self.is_win = False
         self.undraw = False
+        self.frames_before_starting = pyxel.frame_count + 200
 
         self.map_database: list[list[Stone | Brick | Tank | EnemyTank | Bullet | int]] = [[0 for _ in range(self.screen_width // 16)] for _ in range(self.screen_height // 16)] # made this adaptable to screen size
 
@@ -84,7 +85,7 @@ class Game:
                 self.map_database[y_i][x_i] = stone
 
     def generate_player_tank(self):
-        self.player_tank = Tank(0, 0, 'right', 1, 1, False, Bullet(0, 0, 'right', False,'player'))
+        self.player_tank = Tank(0, 0, 'right', 1, 1, False, Bullet(0, 0, 'right', False, 'player'))
         self.map_database[0][0] = self.player_tank
 
     def generate_enem_tank(self):
@@ -137,16 +138,31 @@ class Game:
             self.is_win = True
             self.frames = pyxel.frame_count + 180
 
-    # Check if bullet is still in the game, if it is, keep it moving
+    def is_bullet_from_dead_tank(self, bullet: Bullet) -> bool:
+        for row in self.map_database:
+            for tank in row:
+                if type(tank) == Tank:
+                    if bullet.label == 'player':
+                        # print('Player still alive')
+                        return False
+                elif type(tank) == EnemyTank:
+                    if bullet.label == tank.label:
+                        # print('Enemy still alive')
+                        return False
+        return True
+
+    # Check if bullet is still in the game, if it is, keep it moving. Note: This depends on the Bullet itself.
     def keep_bullet_shooting(self):
         for row in self.map_database:
             for bullet in row:
                 if isinstance(bullet, Bullet):
                     if bullet.label not in self.visited_bullets_so_far:
                         if bullet.is_shoot:
-                            if pyxel.frame_count % 5 == 0:
-                                self.movement(bullet.direction, 'bullet', bullet.x, bullet.y, bullet)
-                                self.visited_bullets_so_far.add(bullet.label)
+                            if self.is_bullet_from_dead_tank(bullet): # We need to limit keep_bullet_shooting so that it only moves bullets that are from dead tanks
+                                print('Coming from dead tank')
+                                if pyxel.frame_count % 5 == 0:
+                                    self.movement(bullet.direction, 'bullet', bullet.x, bullet.y, bullet)
+                                    self.visited_bullets_so_far.add(bullet.label)
         self.visited_bullets_so_far.clear()
 
     def get_new_points(self, x: int, y: int, direction: Literal['left', 'right', 'up', 'down']) -> tuple[int, int]:
@@ -155,8 +171,8 @@ class Game:
     def change_direction_of_entity(self, direction: Literal['left', 'right', 'up', 'down'], entity_move: Tank | EnemyTank | Bullet):
         entity_move.direction = direction
 
-    def handle_collision(self, direction: Literal['left', 'right', 'up', 'down'], entity: Literal['player', 'bullet', 'enemy'], x: int, y: int, is_from: Tank | EnemyTank | Bullet):
-        entity_move = self.map_database[y][x]
+    def handle_collision(self, direction: Literal['left', 'right', 'up', 'down'], entity: Literal['player', 'bullet', 'enemy'], curr_x: int, curr_y: int, is_from: Tank | EnemyTank | Bullet):
+        entity_move = self.map_database[curr_y][curr_x]
 
         if entity == 'player' and isinstance(entity_move, Tank):
             self.change_direction_of_entity(direction, entity_move)
@@ -166,14 +182,53 @@ class Game:
 
         elif entity == 'bullet':
             if not isinstance(entity_move, (Tank, EnemyTank)):
-                self.map_database[y][x] = 0
+                self.map_database[curr_y][curr_x] = 0
 
             is_from.is_shoot = False # to keep the bullet moving/recursing from a tank or enemy tank
 
-    def handle_bullet_damage(self, new_x: int, new_y: int):
+    def handle_bullet_damage(self, new_x: int, new_y: int, is_from: Bullet | Tank | EnemyTank): # I can shorten this pa, but I just want to see each test cases
         entity_on_new_point = self.map_database[new_y][new_x]
-        if isinstance(entity_on_new_point, (Tank, EnemyTank)):
-            entity_on_new_point.hp -= 1
+
+        if type(entity_on_new_point) == Tank:
+            if type(is_from) == EnemyTank and is_from.bullet.label != entity_on_new_point.bullet.label:
+                print('Player tank hit by enemy tank bullet', is_from.label, entity_on_new_point.bullet.label)
+                entity_on_new_point.hp -= 1
+                print(entity_on_new_point.hp)
+
+            if type(is_from) == Tank and is_from.bullet.label == entity_on_new_point.bullet.label:
+                print('Player tank hit by player tank bullet. Suicidal tank lmao.')
+                entity_on_new_point.hp -= 1
+                return
+
+            # -- This is when the self.keep_bullet_shooting() is called, i.e. Bullets are moved from dead tanks --
+            if type(is_from) == Bullet:
+                if is_from.label == 'player':
+                    print('Player tank hit by player tank bullet', is_from.label, entity_on_new_point.bullet.label)
+                    entity_on_new_point.hp -= 1
+                else:
+                    print('Player tank hit by enemy tank bullet', is_from.label, entity_on_new_point.bullet.label)
+                    entity_on_new_point.hp -= 1
+            # -- End of self.keep_bullet_shooting() --
+
+        elif type(entity_on_new_point) == EnemyTank:
+            if type(is_from) == Tank and is_from.bullet.label != entity_on_new_point.label:
+                print('Enemy tank hit by player tank bullet', is_from.bullet.label, entity_on_new_point.label)
+                entity_on_new_point.hp -= 1
+
+            if type(is_from) == EnemyTank:
+                print('Enemy tank hit by enemy tank bullet (should pass through)')
+                return
+             
+            # -- This is when the self.keep_bullet_shooting() is called, i.e. Bullets are moved from dead tanks --
+            if type(is_from) == Bullet: 
+                if is_from.label != 'player':
+                    print('Enemy tank hit by enemy tank bullet', is_from.label, entity_on_new_point.label)
+                    return
+                
+                if is_from.label == 'player':
+                    print('Enemy tank hit by player tank bullet', is_from.label, entity_on_new_point.label)
+                    entity_on_new_point.hp -= 1
+            # -- End of self.keep_bullet_shooting() --
 
     def move_bullet(self, direction: Literal['left', 'right', 'up', 'down'], curr_x: int, curr_y: int, new_x: int, new_y: int, is_from: Tank | EnemyTank | Bullet):
         if isinstance(is_from, (Tank, EnemyTank)):
@@ -216,7 +271,7 @@ class Game:
         elif isinstance(self.map_database[new_y][new_x], (EnemyTank, Tank)):
             self.handle_collision(direction, entity, curr_x, curr_y, is_from)
             if entity == 'bullet': # Bullet finds a tank, tank takes damage
-                self.handle_bullet_damage(new_x, new_y) 
+                self.handle_bullet_damage(new_x, new_y, is_from) 
 
         # Reflect changes into map_database
         else:
@@ -240,19 +295,19 @@ class Game:
                             entity.direction = cast(Literal['left', 'right', 'up', 'down'], directions[randint(0, 3)])  # Set random direction
                             self.movement(entity.direction, 'enemy', entity.x, entity.y, entity)   
 
-                        random_time_interval_to_shoot = randint(30, 50)
-                        if pyxel.frame_count % random_time_interval_to_shoot == 0:
-                            should_shoot = choice([True, False])     
-                            if should_shoot and not entity.is_shoot:
-                                entity.bullet.x, entity.bullet.y, entity.bullet.direction = entity.x, entity.y, entity.direction
-                                entity.is_shoot = True
+                        if pyxel.frame_count > self.frames_before_starting: # Prevents the enemy tank from shooting before the game starts
+                            random_time_interval_to_shoot = randint(30, 50)
+                            if pyxel.frame_count % random_time_interval_to_shoot == 0:
+                                should_shoot = choice([True, False])     
+                                if should_shoot and not entity.is_shoot:
+                                    entity.bullet.x, entity.bullet.y, entity.bullet.direction = entity.x, entity.y, entity.direction
+                                    entity.is_shoot = True
 
-                        if entity.is_shoot:
-                            if pyxel.frame_count % 5 == 0:
-                                self.movement(entity.bullet.direction, 'bullet', entity.bullet.x, entity.bullet.y, entity)
+                            if entity.is_shoot:
+                                if pyxel.frame_count % 5 == 0:
+                                    self.movement(entity.bullet.direction, 'bullet', entity.bullet.x, entity.bullet.y, entity)
                         
                         self.visited_enemy_tanks_so_far.add(entity.label)
-
         self.visited_enemy_tanks_so_far.clear()
 
 
@@ -282,31 +337,30 @@ class Game:
 
             if self.player_tank.hp > 0: # don't move if player tank dead already
                 if pyxel.btn(pyxel.KEY_LEFT):
-                    print('left pressed!', self.player_tank)
+                    # print('left pressed!', self.player_tank)
                     if pyxel.frame_count % 4 == 0:
                         self.movement('left', 'player', self.player_tank.x, self.player_tank.y, self.player_tank)
 
                 elif pyxel.btn(pyxel.KEY_RIGHT):
-                    print('right pressed!', self.player_tank)
+                    # print('right pressed!', self.player_tank)
                     if pyxel.frame_count % 4 == 0:
                         self.movement('right', 'player', self.player_tank.x, self.player_tank.y, self.player_tank)
 
                 elif pyxel.btn(pyxel.KEY_UP):
-                    print('up pressed!', self.player_tank)
+                    # print('up pressed!', self.player_tank)
                     if pyxel.frame_count % 4 == 0:
                         self.movement('up', 'player', self.player_tank.x, self.player_tank.y, self.player_tank)
 
                 elif pyxel.btn(pyxel.KEY_DOWN):
-                    print('down pressed!', self.player_tank)
+                    # print('down pressed!', self.player_tank)
                     if pyxel.frame_count % 4 == 0:
                         self.movement('down', 'player', self.player_tank.x, self.player_tank.y, self.player_tank)
                 
-                if pyxel.btnp(pyxel.KEY_SPACE) and not self.player_tank.is_shoot:
+                if pyxel.btnp(pyxel.KEY_SPACE) and not self.player_tank.is_shoot and pyxel.frame_count > self.frames_before_starting: #  # Uncomment this later. This prevents the player from shooting before the game starts
                     self.player_tank.bullet.x, self.player_tank.bullet.y, self.player_tank.bullet.direction = self.player_tank.x, self.player_tank.y, self.player_tank.direction
                     self.player_tank.is_shoot = True
 
                 if self.player_tank.is_shoot:
-                    print('shooting!', self.player_tank)
                     self.movement(self.player_tank.bullet.direction, 'bullet', self.player_tank.bullet.x, self.player_tank.bullet.y, self.player_tank)
     
             self.eliminate_no_tankhp()
@@ -322,8 +376,20 @@ class Game:
     def draw(self):
         pyxel.cls(4)
 
+        # Countdown timer before starting the game
+        if self.frames_before_starting - pyxel.frame_count >= 0:
+            countdown = self.frames_before_starting - pyxel.frame_count
+            if countdown >= 180:
+                pyxel.text((self.screen_width // 2), (self.screen_height // 2), '3', 1)
+            elif countdown >= 120:
+                pyxel.text((self.screen_width // 2), (self.screen_height // 2), '2', 1)
+            elif countdown >= 60:
+                pyxel.text((self.screen_width // 2), (self.screen_height // 2), '1', 1)
+            else:
+                pyxel.text((self.screen_width // 2), (self.screen_height // 2), 'GO!', 1)
+
         if not self.undraw:
-            #generate graphics based on map_database
+            # Generate graphics based on map_database
             for row in self.map_database:
                 for entity in row:
                     if type(entity) == Tank:
@@ -350,9 +416,9 @@ class Game:
                         pyxel.blt(entity.x*16, entity.y*16, 0, 0, 16, 16, 16, 0)
         else:
             if self.is_gameover:
-                pyxel.text((self.screen_width // 2) - 20, (self.screen_height // 2) - 20, 'GAME OVER', 1) # temporary values. might have to make a game over splash screen instead since the text is small
+                pyxel.text((self.screen_width // 2) - 20, (self.screen_height // 2) - 20, 'GAME OVER', 1) # Temporary values. might have to make a game over splash screen instead since the text is small
             elif self.is_win:
-                pyxel.text((self.screen_width // 2) - 20, (self.screen_height // 2) - 20, 'YOU WIN!', 1) 
+                pyxel.text((self.screen_width // 2) - 20, (self.screen_height // 2) - 20, 'YOU WIN!', 1)
 
 
                 
