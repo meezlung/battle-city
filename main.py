@@ -64,7 +64,8 @@ class Game:
 
         self.num_stones: int = 10 # removed in phase 2
         self.num_mirrors: int = 5 # removed in phase 2
-        self.num_tanks: int = 5 # removed in phase 2 (?)
+        self.num_bricks: int = 10
+        self.num_tanks: int = 1 # removed in phase 2 (?)
         self.rem_tanks = self.num_tanks # this has to be updated every time a new tank spawns in too
 
         self.visited_enemy_tanks_so_far: set[str] = set() 
@@ -72,10 +73,11 @@ class Game:
 
         self.is_shoot_bullet = False
 
-        # pyxel.playm(0, loop=True) # :3 
+        #pyxel.playm(0, loop=True) # :3 
 
         self.generate_player_tank()
         self.generate_stone_cells()
+        self.generate_bricks()
         self.generate_mirrors()
         self.generate_enem_tank()
 
@@ -88,6 +90,15 @@ class Game:
             if self.check_if_pos_is_unique(x_i, y_i):
                 stone = Stone(x_i, y_i)
                 self.map_database[y_i][x_i] = stone
+
+    def generate_bricks(self):
+        for _ in range(self.num_bricks):
+            x_i = randint(0, 24)
+            y_i = randint(0, 15)
+
+            if self.check_if_pos_is_unique(x_i, y_i):
+                brick = Brick(x_i, y_i, 2)
+                self.map_database[y_i][x_i] = brick
 
     def generate_mirrors(self):
         for _ in range(self.num_mirrors):
@@ -135,21 +146,29 @@ class Game:
         return self.map_database[y][x] == 0
 
     # Check tank hp, remove tank if hp == 0
-    def eliminate_no_tankhp(self):
+    def eliminate_no_hp_entity(self):
         for row in self.map_database:
-            for tank in row:
-                if isinstance(tank, (Tank, EnemyTank)):
-                    if tank.hp <= 0:
+            for entity in row:
+                if isinstance(entity, (Tank, EnemyTank)):
+                    if entity.hp <= 0:
                         destroyposrow = self.map_database.index(row)
-                        destroypos = self.map_database[destroyposrow].index(tank)
+                        destroypos = self.map_database[destroyposrow].index(entity)
                         self.map_database[destroyposrow][destroypos] = 0
+                        pyxel.play(1, 1)
 
-                        if type(tank) == Tank and tank.hp == 0:
+                        if type(entity) == Tank and entity.hp == 0:
                             self.is_gameover = True
                             self.frames = pyxel.frame_count + 180
                         else:
                             self.rem_tanks -= 1
                             print(self.rem_tanks)
+
+                elif isinstance(entity, (Brick)):
+                    if entity.hp <= 0:
+                        destroyposrow = self.map_database.index(row)
+                        destroypos = self.map_database[destroyposrow].index(entity)
+                        self.map_database[destroyposrow][destroypos] = 0
+                        pyxel.play(2, 2)
 
     def check_rem_tanks(self):
         if self.rem_tanks == 0 and not self.is_win:
@@ -215,6 +234,7 @@ class Game:
         elif entity == 'bullet':
             if not isinstance(entity_move, (Tank, EnemyTank)):
                 self.map_database[curr_y][curr_x] = 0
+                pyxel.play(2, 2)
 
             is_from.is_shoot = False # to keep the bullet moving/recursing from a tank or enemy tank
 
@@ -224,7 +244,7 @@ class Game:
 
         if type(bullet1) == type(bullet2) and isinstance(bullet1, Bullet) and isinstance(bullet2, Bullet):
             print("Bullet collision happened", bullet1, bullet2)      
-
+            pyxel.play(2, 2)
             bullet1.is_shoot = False
             bullet2.is_shoot = False
             print('Suspect')
@@ -318,8 +338,11 @@ class Game:
 # ------- Helper Functions -------
 
 # ------- Main collision checker + Entity movement function -------
-    def movement(self, direction: Literal['left', 'right', 'up', 'down'], entity: Literal['player', 'bullet', 'enemy'], curr_x: int, curr_y: int, is_from: Tank | EnemyTank | Bullet):
-        new_x, new_y = self.get_new_points(curr_x, curr_y, direction)
+    def movement(self, direction: Literal['left', 'right', 'up', 'down'], entity: Literal['player', 'bullet', 'enemy'], curr_x: int, curr_y: int, is_from: Tank | EnemyTank | Bullet, Mirror_move: bool = False, orient: Literal['NE','SE'] = 'NE'): #this last arguement really sucks but its the only way to tie the collision detection back to the mirror movement
+        if Mirror_move: #if the movement function got called from the bullet-mirror collision check
+            new_x, new_y, direction = self.get_mirror_points(curr_x, curr_y, direction, orient)
+        else: #maybe we could merge get_new_points and get_mirror_points?
+            new_x, new_y = self.get_new_points(curr_x, curr_y, direction)
         
         # Bounds checking
         if not (0 <= new_x < self.screen_width // 16) or not (0 <= new_y < self.screen_height // 16):
@@ -328,6 +351,10 @@ class Game:
         # Check if there is an entity ahead of the entity trying to move, if there is one, do not move
         elif isinstance(self.map_database[new_y][new_x], Stone):
             self.handle_collision(direction, entity, curr_x, curr_y, is_from)
+            obstype = self.map_database[new_y][new_x]
+            if isinstance(obstype, Brick):
+                if entity == 'bullet':
+                    obstype.hp -= 1
 
         # If entity ahead is a mirror, separate collision check
         elif entity == 'bullet' and isinstance(self.map_database[new_y][new_x], Mirror):
@@ -335,9 +362,10 @@ class Game:
             print('Mirror!', mirror)
             if isinstance(mirror, (Mirror)):
                 orient = mirror.orientation
-                mir_x, mir_y, mir_dir = self.get_mirror_points(curr_x, curr_y, direction, orient)
-                self.handle_collision(mir_dir,entity,mir_x,mir_y,is_from)
-                self.move_bullet(mir_dir,curr_x,curr_y,mir_x,mir_y,is_from)
+                #mir_x, mir_y, mir_dir = self.get_mirror_points(curr_x, curr_y, direction, orient)
+                #self.handle_collision(mir_dir,entity,mir_x,mir_y,is_from)
+                #self.move_bullet(mir_dir,curr_x,curr_y,mir_x,mir_y,is_from)
+                self.movement(direction, "bullet", curr_x, curr_y, is_from, True, orient)
 
         elif isinstance(self.map_database[new_y][new_x], (EnemyTank, Tank)):
             self.handle_collision(direction, entity, curr_x, curr_y, is_from)
@@ -376,6 +404,7 @@ class Game:
                             if pyxel.frame_count % random_time_interval_to_shoot == 0:
                                 should_shoot = choice([True, False])     
                                 if should_shoot and not entity.is_shoot:
+                                    pyxel.play(0, 0)
                                     entity.bullet.x, entity.bullet.y, entity.bullet.direction = entity.x, entity.y, entity.direction
                                     entity.is_shoot = True
                                     entity.bullet.is_shoot = True
@@ -434,6 +463,7 @@ class Game:
                         self.movement('down', 'player', self.player_tank.x, self.player_tank.y, self.player_tank)
                 
                 if pyxel.btnp(pyxel.KEY_SPACE) and not self.player_tank.is_shoot and pyxel.frame_count > self.frames_before_starting: #  # Uncomment this later. This prevents the player from shooting before the game starts
+                    pyxel.play(0, 0)
                     self.player_tank.bullet.x, self.player_tank.bullet.y, self.player_tank.bullet.direction = self.player_tank.x, self.player_tank.y, self.player_tank.direction
                     self.player_tank.is_shoot = True
                     self.player_tank.bullet.is_shoot = True
@@ -441,7 +471,7 @@ class Game:
                 if self.player_tank.is_shoot and self.player_tank.bullet.is_shoot:
                     self.movement(self.player_tank.bullet.direction, 'bullet', self.player_tank.bullet.x, self.player_tank.bullet.y, self.player_tank)
     
-            self.eliminate_no_tankhp()
+            self.eliminate_no_hp_entity()
             
             self.ai_tanks_moves()
 
@@ -452,7 +482,7 @@ class Game:
 
 
     def draw(self):
-        pyxel.cls(4)
+        pyxel.cls(14)
 
         # Countdown timer before starting the game
         if self.frames_before_starting - pyxel.frame_count >= 0:
@@ -481,6 +511,11 @@ class Game:
                             pyxel.blt(entity.x*16, entity.y*16, 0, 48, 0, 16, 16, 0)
                     elif type(entity) == Stone:
                         pyxel.blt(entity.x*16, entity.y*16, 0, 16, 16, 16, 16, 0)
+                    elif type(entity) == Brick:
+                        if entity.hp == 2:
+                            pyxel.blt(entity.x*16, entity.y*16, 0, 0, 48, 16, 16, 0)
+                        else:
+                            pyxel.blt(entity.x*16, entity.y*16, 0, 16, 48, 16, 16, 0)
                     elif type(entity) == EnemyTank:
                         if entity.direction == 'up':
                             pyxel.blt(entity.x*16, entity.y*16, 0, 0, 32, 16, 16, 0)
