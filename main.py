@@ -91,6 +91,36 @@ class Game:
                 stone = Stone(x_i, y_i)
                 self.map_database[y_i][x_i] = stone
 
+    # This is for debugging purposes only, don't mind these XD
+    def generate_chained_mirrors(self):
+        x_i = randint(0, 24)
+        y_i = randint(0, 15)
+
+        if self.check_if_pos_is_unique(x_i, y_i):
+            self.map_database[y_i][x_i] = Mirror(x_i, y_i, 'NE')
+
+            if self.check_if_pos_is_unique(x_i + 1, y_i):
+                self.map_database[y_i][x_i + 1] = Mirror(x_i + 1, y_i, 'SE')   
+                
+                if self.check_if_pos_is_unique(x_i + 1, y_i + 1):
+                    self.map_database[y_i + 1][x_i + 1] = Mirror(x_i + 1, y_i + 1, 'NE')     
+
+    def generate_snake_mirrors(self):
+        x_i = 5
+        y_i = 5
+
+        if self.check_if_pos_is_unique(x_i, y_i):
+            self.map_database[y_i][x_i] = Mirror(x_i, y_i, 'NE')
+
+            if self.check_if_pos_is_unique(x_i + 1, y_i):
+                self.map_database[y_i][x_i + 1] = Mirror(x_i + 1, y_i, 'NE')
+
+                if self.check_if_pos_is_unique(x_i + 1, y_i - 1):
+                    self.map_database[y_i - 1][x_i + 1] = Mirror(x_i + 1, y_i - 1, 'NE')
+                    
+                    if self.check_if_pos_is_unique(x_i + 2, y_i - 1):
+                        self.map_database[y_i - 1][x_i + 2] = Mirror(x_i + 2, y_i - 1, 'NE')
+
     def generate_bricks(self):
         for _ in range(self.num_bricks):
             x_i = randint(0, 24)
@@ -232,7 +262,7 @@ class Game:
             self.change_direction_of_entity(direction, entity_move)
 
         elif entity == 'bullet':
-            if not isinstance(entity_move, (Tank, EnemyTank)):
+            if not isinstance(entity_move, (Tank, EnemyTank, Mirror)):
                 self.map_database[curr_y][curr_x] = 0
                 pyxel.play(2, 2)
 
@@ -311,6 +341,24 @@ class Game:
                     entity_on_new_point.hp -= 1
             # -- End of self.keep_bullet_shooting() --
 
+        elif type(entity_on_new_point) == Brick:
+            entity_on_new_point.hp -= 1 
+
+    def handle_bullet_to_mirror_result(self, direction: Literal['left', 'right', 'up', 'down'], curr_x: int, curr_y: int, new_x: int, new_y: int, is_from: Bullet | Tank | EnemyTank, how_many_times_is_mirror_called: int, prev_mirror_call_pos: tuple[int, int], last_bullet_pos_before_hitting_mirror: tuple[int, int]):
+        mirror = self.map_database[new_y][new_x]
+
+        if isinstance(mirror, (Mirror)) and how_many_times_is_mirror_called <= 0:
+            orient = mirror.orientation
+            prev_mirror_call_pos = (mirror.x, mirror.y)
+            last_bullet_pos_before_hitting_mirror = (curr_x, curr_y)
+            print(prev_mirror_call_pos)
+            self.movement(direction, "bullet", curr_x, curr_y, is_from, True, orient, how_many_times_is_mirror_called + 1, prev_mirror_call_pos, last_bullet_pos_before_hitting_mirror)
+        elif isinstance(mirror, Mirror) and how_many_times_is_mirror_called > 0: # Edge cases for chained mirrors
+            orient = mirror.orientation
+            if isinstance(self.map_database[last_bullet_pos_before_hitting_mirror[1]][last_bullet_pos_before_hitting_mirror[0]], Bullet):
+                self.map_database[last_bullet_pos_before_hitting_mirror[1]][last_bullet_pos_before_hitting_mirror[0]] = 0
+            self.movement(direction, "bullet", prev_mirror_call_pos[0], prev_mirror_call_pos[1], is_from, True, orient, how_many_times_is_mirror_called + 1, (mirror.x, mirror.y))
+
     def move_bullet(self, direction: Literal['left', 'right', 'up', 'down'], curr_x: int, curr_y: int, new_x: int, new_y: int, is_from: Tank | EnemyTank | Bullet):
         if isinstance(is_from, (Tank, EnemyTank)):
             self.map_database[new_y][new_x] = Bullet(new_x, new_y, direction, True, is_from.bullet.label)
@@ -338,34 +386,36 @@ class Game:
 # ------- Helper Functions -------
 
 # ------- Main collision checker + Entity movement function -------
-    def movement(self, direction: Literal['left', 'right', 'up', 'down'], entity: Literal['player', 'bullet', 'enemy'], curr_x: int, curr_y: int, is_from: Tank | EnemyTank | Bullet, Mirror_move: bool = False, orient: Literal['NE','SE'] = 'NE'): #this last arguement really sucks but its the only way to tie the collision detection back to the mirror movement
-        if Mirror_move: #if the movement function got called from the bullet-mirror collision check
+    def movement(self, direction: Literal['left', 'right', 'up', 'down'], entity: Literal['player', 'bullet', 'enemy'], curr_x: int, curr_y: int, is_from: Tank | EnemyTank | Bullet, mirror_move: bool = False, orient: Literal['NE','SE'] = 'NE', how_many_times_is_mirror_called: int = 0, prev_mirror_call_pos: tuple[int, int] = (0, 0), last_bullet_pos_before_hitting_mirror: tuple[int, int] = (0, 0)): #this last arguement really sucks but its the only way to tie the collision detection back to the mirror movement
+        # --- Base Case for the Mirror function ---       
+        if mirror_move: # If the movement function got called from the bullet-mirror collision check
             new_x, new_y, direction = self.get_mirror_points(curr_x, curr_y, direction, orient)
-        else: #maybe we could merge get_new_points and get_mirror_points?
+
+        else: # Maybe we could merge get_new_points and get_mirror_points?
             new_x, new_y = self.get_new_points(curr_x, curr_y, direction)
-        
-        # Bounds checking
+        # --- End of Base Case for the Mirror function ---       
+
+
+        # --- Bounds checking ---
         if not (0 <= new_x < self.screen_width // 16) or not (0 <= new_y < self.screen_height // 16):
             self.handle_collision(direction, entity, curr_x, curr_y, is_from)
+        # --- End of Bounds checking ---
 
-        # Check if there is an entity ahead of the entity trying to move, if there is one, do not move
+
+        # --- Check if there is an entity ahead of the entity trying to move. If there is one, do not move --- 
         elif isinstance(self.map_database[new_y][new_x], Stone):
             self.handle_collision(direction, entity, curr_x, curr_y, is_from)
-            obstype = self.map_database[new_y][new_x]
-            if isinstance(obstype, Brick):
-                if entity == 'bullet':
-                    obstype.hp -= 1
 
-        # If entity ahead is a mirror, separate collision check
-        elif entity == 'bullet' and isinstance(self.map_database[new_y][new_x], Mirror):
-            mirror = self.map_database[new_y][new_x]
-            print('Mirror!', mirror)
-            if isinstance(mirror, (Mirror)):
-                orient = mirror.orientation
-                #mir_x, mir_y, mir_dir = self.get_mirror_points(curr_x, curr_y, direction, orient)
-                #self.handle_collision(mir_dir,entity,mir_x,mir_y,is_from)
-                #self.move_bullet(mir_dir,curr_x,curr_y,mir_x,mir_y,is_from)
-                self.movement(direction, "bullet", curr_x, curr_y, is_from, True, orient)
+            if isinstance(self.map_database[new_y][new_x], Brick): # Under the stone, since Brick inherits from Stone
+                if entity == 'bullet': # If a bullet discovers a Brick in front of it, subtract hp of brick
+                    self.handle_bullet_damage(new_x, new_y, is_from)
+
+        elif isinstance(self.map_database[new_y][new_x], Mirror):
+            if entity == 'bullet':
+                self.handle_bullet_to_mirror_result(direction, curr_x, curr_y, new_x, new_y, is_from, how_many_times_is_mirror_called, prev_mirror_call_pos, last_bullet_pos_before_hitting_mirror)
+
+            else: # For the tanks that want to rotate in the direction of the mirror
+                self.handle_collision(direction, entity, curr_x, curr_y, is_from)
 
         elif isinstance(self.map_database[new_y][new_x], (EnemyTank, Tank)):
             self.handle_collision(direction, entity, curr_x, curr_y, is_from)
@@ -375,8 +425,10 @@ class Game:
         elif isinstance(self.map_database[new_y][new_x], Bullet):
             if entity == 'bullet': # Bullet finds another bullet, both bullets should disappear
                 self.handle_bullet_to_bullet_collision(new_x, new_y, curr_x, curr_y) 
+        # --- End of Check if there is an entity ahead of the entity trying to move. If there is one, do not move --- 
 
-        # Reflect changes into map_database
+
+        # --- If there is no entity ahead, you can safely move ---
         else:
             # A bullet generates differently than any other entity, thus it must be treated as a separate case
             if entity == 'bullet': 
@@ -385,6 +437,7 @@ class Game:
 
             else:
                 self.move_tanks(direction, entity, curr_x, curr_y, new_x, new_y)
+        # --- End of If there is no entity ahead, you can safely move ---
 # -- Main collision checker + Entity movement function --
 
 
