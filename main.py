@@ -3,6 +3,7 @@ from dataclasses import dataclass
 import pyxelgrid # type: ignore
 from random import randint, choice
 from typing import Literal, cast
+import json
 
 @dataclass
 class Bullet:
@@ -49,6 +50,9 @@ class Game:
         pyxel.init(self.screen_width, self.screen_height, fps=60)
         pyxel.load('assets/assets.pyxres')
 
+        with open('assets/levels/test.json') as self.map_file:
+            self.map_load = json.load(self.map_file)
+
         self.init_gamestate() # para maplay music even after gameover
         
         pyxel.run(self.update, self.draw)
@@ -60,8 +64,10 @@ class Game:
         self.undraw = False
         self.frames_before_starting = pyxel.frame_count + 200
 
-        self.map_database: list[list[Stone | Brick | Tank | EnemyTank | Bullet | Mirror | int]] = [[0 for _ in range(self.screen_width // 16)] for _ in range(self.screen_height // 16)] # made this adaptable to screen size
+        #a standard map is 25x16 cells
+        #self.map_database: list[list[Stone | Brick | Tank | EnemyTank | Bullet | Mirror | int]] = [[0 for _ in range(self.screen_width // 16)] for _ in range(self.screen_height // 16)] # made this adaptable to screen size
 
+        self.map_database: list[list[Stone | Brick | Tank | EnemyTank | Bullet | Mirror | int]] = self.map_load["map"]
         self.num_stones: int = 10 # removed in phase 2
         self.num_mirrors: int = 5 # removed in phase 2
         self.num_bricks: int = 10
