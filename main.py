@@ -94,6 +94,22 @@ class Game:
                 self.map_database[y_i][x_i] = stone
 
     # -- Debugging Functions --
+    def generate_mirrors_to_kill_player(self):
+        x_i = 5
+        y_i = 5
+
+        if self.check_if_pos_is_unique(x_i, y_i):
+            self.map_database[y_i][x_i] = Mirror(x_i, y_i, 'NE')
+
+            if self.check_if_pos_is_unique(x_i + 8, y_i):
+                self.map_database[y_i][x_i + 8] = Mirror(x_i + 8, y_i, 'SE')
+
+                if self.check_if_pos_is_unique(x_i + 8, y_i + 4):
+                    self.map_database[y_i + 4][x_i + 8] = Mirror(x_i + 8, y_i + 4, 'NE')
+
+                    if self.check_if_pos_is_unique(x_i, y_i + 4):
+                        self.map_database[y_i + 4][x_i] = Mirror(x_i, y_i + 4, 'SE')
+
     def generate_chained_mirrors(self):
         x_i = randint(0, 24)
         y_i = randint(0, 15)
@@ -337,14 +353,14 @@ class Game:
             if type(is_from) == Tank and is_from.bullet.label == entity_on_new_point.bullet.label:
                 print('Player tank hit by player tank bullet. Suicidal tank lmao.')
                 entity_on_new_point.hp -= 1
-                self.handle_collision(is_from.bullet.direction, 'bullet', new_x, new_y, is_from)
+                self.handle_collision(is_from.bullet.direction, 'bullet', curr_x, curr_y, is_from)
 
             # -- This is when the self.keep_bullet_shooting() is called, i.e. Bullets are moved from dead tanks --
             if type(is_from) == Bullet:
                 if is_from.label == 'player':
                     print('Player tank hit by player tank bullet', is_from.label, entity_on_new_point.bullet.label)
                     entity_on_new_point.hp -= 1
-                    self.handle_collision(is_from.direction, 'bullet', new_x, new_y, is_from)
+                    self.handle_collision(is_from.direction, 'bullet', curr_x, curr_y, is_from)
                 else:
                     print('Player tank hit by enemy tank bullet', is_from.label, entity_on_new_point.bullet.label)
                     entity_on_new_point.hp -= 1
