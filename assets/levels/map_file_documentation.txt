@@ -1,0 +1,33 @@
+A battle city map file is a json file.
+it should be named as "levelX.json, where X is the level number.
+
+inside the json file are the following:
+
+level: [int]
+- the level of the map
+
+stage_name: [str]
+- the name of the stage
+
+enemy_count: [int]
+- the number of enemies to spawn periodically in the map
+
+map: list[list[int]]
+- a list of lists where each inner list's items correspond to a specific cell of a map. This is used for generating the map when the game/next level starts
+
+---------------------------------
+
+A map consists of the following elements:
+
+0 - An empty cell
+1 - Player's Tank
+2 - Enemy tank spawn point
+3 - Player's home base
+4 - Stone
+5 - Brick
+6 - Mirror (North-East Facing)
+7 - Mirror (South-East Facing)
+8 - Water
+9 - Forest
+
+
