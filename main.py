@@ -56,19 +56,21 @@ class Game:
     def __init__(self):
         self.screen_width = 400
         self.screen_height = 272
-        
+        self.level = 1
+        self.hp = 3
+
         pyxel.init(self.screen_width, self.screen_height, fps=60)
         pyxel.load('assets/assets.pyxres')
-
-        with open('assets/levels/test.json') as self.map_file:
-            self.map_load = json.load(self.map_file)
-
+    
         self.init_gamestate() # para maplay music even after gameover
         
         pyxel.run(self.update, self.draw)
 
 # ------- Generator Functions -------
     def init_gamestate(self):
+        with open('assets/levels/level' + str(self.level) + '.json') as self.map_file:
+            self.map_load = json.load(self.map_file)
+
         self.is_gameover = False
         self.is_win = False
         self.undraw = False
@@ -87,6 +89,7 @@ class Game:
         self.num_tanks: int = self.map_load["enemy_count"]
         self.rem_tanks = self.num_tanks # this has to be updated every time a new tank spawns in too
 
+        self.spawnpoint: tuple[int,int]
         self.dedicated_enem_spawn: list[tuple[int,int]] = []
         self.forest_draw: list[tuple[int,int]] = []
         self.visited_enemy_tanks_so_far: set[str] = set() 
@@ -112,6 +115,7 @@ class Game:
                 if entity[1] == 1:
                     self.player_tank = Tank(entity[0], row[0], 'right', 1, 1, False, Bullet(0, 0, 'right', False, 'player'))
                     self.map_database[row[0]][entity[0]] = self.player_tank
+                    self.spawnpoint = (entity[0],row[0])
                 if entity[1] == 2:
                     self.dedicated_enem_spawn.append((entity[0],row[0]))
                 if entity[1] == 3:
@@ -133,6 +137,7 @@ class Game:
                     self.map_database[row[0]][entity[0]] = water
                 if entity[1] == 9:
                     self.forest_draw.append((entity[0],row[0]))
+        self.map_file.close()
     # ------- End of Generator Functions -------
 
     # ------- random level generator mode (unused) -------
@@ -256,8 +261,10 @@ class Game:
                         pyxel.play(1, 1)
 
                         if type(entity) == Tank and entity.hp == 0:
-                            self.is_gameover = True
-                            self.frames = pyxel.frame_count + 180
+                            self.hp -= 1
+                            if self.hp == 0:
+                                self.is_gameover = True
+                                self.frames = pyxel.frame_count + 180
                         else:
                             self.rem_tanks -= 1
                             print(self.rem_tanks)
@@ -566,13 +573,20 @@ class Game:
     def update(self):
         #if pyxel.frame_count % 180 == 0: #enemy tank spawns in an interval of 3 seconds, maybe this can be configured in the map file for increasing difficulty
             #self.generate_enem_tank() #this code is extremely broken atm
-        
+        if self.player_tank.hp == 0 and pyxel.btnp(pyxel.KEY_R):
+            self.player_tank = Tank(self.spawnpoint[0], self.spawnpoint[1], 'right', 1, 1, False, Bullet(0, 0, 'right', False, 'player'))
+            self.map_database[self.spawnpoint[1]][self.spawnpoint[0]] = self.player_tank
+            
         if self.is_gameover or self.is_win:
             if pyxel.frame_count > self.frames:
                 self.undraw = True
                 pyxel.stop() # stop music
 
-            if pyxel.btnp(pyxel.KEY_R):
+            if self.is_gameover and pyxel.btnp(pyxel.KEY_R):
+                self.level = 1
+                self.init_gamestate()
+            elif self.is_win and pyxel.btnp(pyxel.KEY_RETURN):
+                self.level += 1
                 self.init_gamestate()
 
         if not self.undraw:
@@ -589,7 +603,7 @@ class Game:
             if pyxel.btnp(pyxel.KEY_T): # debug key, checks map state mid-game
                 print(self.map_database)
 
-            if self.player_tank.hp > 0 and not self.is_win and not self.is_gameover: # don't move if player tank dead already
+            if self.hp > 0 and not self.is_win and not self.is_gameover: # don't move if player tank dead already # instead of checking self_tank_hp, this allows for ai to move when the player dies and still has lives left.
                 if pyxel.btn(pyxel.KEY_LEFT):
                     # print('left pressed!', self.player_tank)
                     if pyxel.frame_count % 4 == 0:
