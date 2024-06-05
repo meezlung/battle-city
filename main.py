@@ -42,10 +42,20 @@ class Mirror:
     y: int
     orientation: Literal['NE', 'SE']
 
+@dataclass
+class Water:
+    x: int
+    y: int
+
+@dataclass #might not be needed because of my implementation?
+class Forest:
+    x: int
+    y: int
+
 class Game:
     def __init__(self):
         self.screen_width = 400
-        self.screen_height = 256
+        self.screen_height = 272
         
         pyxel.init(self.screen_width, self.screen_height, fps=60)
         pyxel.load('assets/assets.pyxres')
@@ -65,15 +75,20 @@ class Game:
         self.frames_before_starting = pyxel.frame_count + 200
 
         #a standard map is 25x16 cells
-        #self.map_database: list[list[Stone | Brick | Tank | EnemyTank | Bullet | Mirror | int]] = [[0 for _ in range(self.screen_width // 16)] for _ in range(self.screen_height // 16)] # made this adaptable to screen size
+        self.map_database: list[list[Stone | Brick | Tank | EnemyTank | Bullet | Mirror | Water | Forest | int]] = [[0 for _ in range(self.screen_width // 16)] for _ in range(self.screen_height // 16)] # made this adaptable to screen size
 
-        self.map_database: list[list[Stone | Brick | Tank | EnemyTank | Bullet | Mirror | int]] = self.map_load["map"]
+        
+        #self.map_loader: list[list[Stone | Brick | Tank | EnemyTank | Bullet | Mirror | int]] = self.map_load["map"] #using this directly as map_database causes list mutation after restarting a game. TOO BAD
+        self.map = self.map_load["map"]
         self.num_stones: int = 10 # removed in phase 2
         self.num_mirrors: int = 5 # removed in phase 2
         self.num_bricks: int = 10
-        self.num_tanks: int = 5 # removed in phase 2 (?)
+        self.concurrent_enem_spawn: int = 0
+        self.num_tanks: int = self.map_load["enemy_count"]
         self.rem_tanks = self.num_tanks # this has to be updated every time a new tank spawns in too
 
+        self.dedicated_enem_spawn: list[tuple[int,int]] = []
+        self.forest_draw: list[tuple[int,int]] = []
         self.visited_enemy_tanks_so_far: set[str] = set() 
         self.visited_bullets_so_far: set[str] = set()
 
@@ -83,13 +98,44 @@ class Game:
 
         #pyxel.playm(0, loop=True) # :3 
 
-        self.generate_player_tank()
-        self.generate_stone_cells()
-        self.generate_bricks()
-        self.generate_mirrors()
+        self.generate_level()
+        #self.generate_player_tank()
+        #self.generate_stone_cells()
+        #self.generate_bricks()
+        #self.generate_mirrors()
         self.generate_enem_tank()
 
     # Main priority in generation is to ensure that the tanks and stones do not overlap each other
+    def generate_level(self):
+        for row in enumerate(self.map):
+            for entity in enumerate(row[1]):
+                if entity[1] == 1:
+                    self.player_tank = Tank(entity[0], row[0], 'right', 1, 1, False, Bullet(0, 0, 'right', False, 'player'))
+                    self.map_database[row[0]][entity[0]] = self.player_tank
+                if entity[1] == 2:
+                    self.dedicated_enem_spawn.append((entity[0],row[0]))
+                if entity[1] == 3:
+                    pass # player's home base not yet implemented
+                if entity[1] == 4:
+                    stone = Stone(entity[0], row[0])
+                    self.map_database[row[0]][entity[0]] = stone
+                if entity[1] == 5:
+                    brick = Brick(entity[0], row[0], 2)
+                    self.map_database[row[0]][entity[0]] = brick
+                if entity[1] == 6:
+                    mirror_ne = Mirror(entity[0], row[0], 'NE')
+                    self.map_database[row[0]][entity[0]] = mirror_ne
+                if entity[1] == 7:
+                    mirror_se = Mirror(entity[0], row[0], 'SE')
+                    self.map_database[row[0]][entity[0]] = mirror_se
+                if entity[1] == 8:
+                    water = Water(entity[0], row[0])
+                    self.map_database[row[0]][entity[0]] = water
+                if entity[1] == 9:
+                    self.forest_draw.append((entity[0],row[0]))
+    # ------- End of Generator Functions -------
+
+    # ------- random level generator mode (unused) -------
     def generate_stone_cells(self):
         for _ in range(self.num_stones):
             x_i = randint(0, 24)
@@ -164,20 +210,23 @@ class Game:
         self.map_database[0][0] = self.player_tank
 
     def generate_enem_tank(self):
+        #print(self.concurrent_enem_spawn)
         random_label = 33
+        #if self.concurrent_enem_spawn < self.num_tanks: this is extremely broken atm
         for _ in range(self.num_tanks):
-            x_i = randint(0, 24)
-            y_i = randint(0, 15)
+            pick = randint(0,len(self.dedicated_enem_spawn)-1)
+            x_i, y_i = self.dedicated_enem_spawn[pick]
 
             if self.check_if_pos_is_unique(x_i, y_i):
-                print(x_i, y_i)
+                #print(x_i, y_i)
                 enem_tank = EnemyTank(x_i, y_i, 'up', 1, 1, False, Bullet(x_i, y_i, 'up', False, chr(random_label)), chr(random_label)) # we should generate randomize labels infinitely to prevent bug in infinitely many tanks generation
                 self.map_database[y_i][x_i] = enem_tank
                 random_label += 1
+                self.concurrent_enem_spawn += 1
             else:
                 while not self.check_if_pos_is_unique(x_i, y_i):
-                    x_i = randint(0, 24)
-                    y_i = randint(0, 15)
+                    pick = randint(0,len(self.dedicated_enem_spawn)-1)
+                    x_i, y_i = self.dedicated_enem_spawn[pick]
                     
                     if self.check_if_pos_is_unique(x_i, y_i):
                         enem_tank = EnemyTank(x_i, y_i, 'up', 1, 1, False, Bullet(x_i, y_i, 'up', False, chr(random_label)), chr(random_label)) # we should generate randomize labels infinitely to prevent bug in infinitely many tanks generation
@@ -185,10 +234,11 @@ class Game:
                         break
 
                     random_label += 1
+                    self.concurrent_enem_spawn += 1
 
     def generate_duplicate_map_database(self) -> list[list[Stone | Brick | Tank | EnemyTank | Bullet | Mirror | int]]: # This is for overwriting purposes
         return [[0 for _ in range(self.screen_width // 16)] for _ in range(self.screen_height // 16)]
-# ------- End of Generator Functions -------
+    # ------- end of random level generator mode (unused) -------
 
 # ------- Helper Functions -------
     def check_if_pos_is_unique(self, x: int, y: int) -> bool:
@@ -514,6 +564,9 @@ class Game:
 
 
     def update(self):
+        #if pyxel.frame_count % 180 == 0: #enemy tank spawns in an interval of 3 seconds, maybe this can be configured in the map file for increasing difficulty
+            #self.generate_enem_tank() #this code is extremely broken atm
+        
         if self.is_gameover or self.is_win:
             if pyxel.frame_count > self.frames:
                 self.undraw = True
@@ -615,11 +668,17 @@ class Game:
                             pyxel.blt(entity.x*16, entity.y*16, 0, 32, 16, 16, 16, 0)
                         else:
                             pyxel.blt(entity.x*16, entity.y*16, 0, 48, 16, 16, 16, 0)
+                    elif type(entity) == Water:
+                        pyxel.blt(entity.x*16, entity.y*16, 0, 32, 48, 16, 16, 0)
+                    
+                    for forest in self.forest_draw:
+                        pyxel.blt(forest[0]*16, forest[1]*16, 0, 48, 48, 16, 16, 0)
         else:
             if self.is_gameover:
                 pyxel.text((self.screen_width // 2) - 20, (self.screen_height // 2) - 20, 'GAME OVER', 1) # Temporary values. might have to make a game over splash screen instead since the text is small
             elif self.is_win:
                 pyxel.text((self.screen_width // 2) - 20, (self.screen_height // 2) - 20, 'YOU WIN!', 1)
+
 
 
         if self.should_overwrite_bullet:
