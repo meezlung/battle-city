@@ -91,10 +91,8 @@ class Game:
         self.concurrent_enem_spawn: int = 0
         self.dedicated_enem_spawn: list[tuple[int, int]] = []
 
-        self.duplicate_map_database: list[list[Stone | Brick | Tank | EnemyTank | Bullet | Mirror | int]] = []
+        self.duplicate_map_database: list[list[Stone | Brick | Tank | EnemyTank | Bullet | Mirror | int]] = [[0 for _ in range(self.screen_width // 16)] for _ in range(self.screen_height // 16)]
         self.forest_draw: list[tuple[int, int]] = [] # Overwriting purposes
-        self.bullet_draw: list[tuple[int, int]] = []
-        self.previous_bullet_positions: list[tuple[int, int]] = []
 
         # Helpful checks
         self.visited_enemy_tanks_so_far: set[str] = set() 
@@ -116,7 +114,7 @@ class Game:
                 if entity[1] == 1:
                     self.player_tank = Tank(entity[0], row[0], 'right', 1, 1, False, Bullet(0, 0, 'right', False, 'player'))
                     self.map_database[row[0]][entity[0]] = self.player_tank
-                    self.spawnpoint = (entity[0],row[0])
+                    self.spawnpoint = (entity[0], row[0])
                 if entity[1] == 2:
                     self.dedicated_enem_spawn.append((entity[0],row[0]))
                 if entity[1] == 3:
@@ -260,9 +258,6 @@ class Game:
 
                     random_label += 1
                     self.concurrent_enem_spawn += 1
-
-    def generate_duplicate_map_database(self) -> list[list[Stone | Brick | Tank | EnemyTank | Bullet | Mirror | int]]: # This is for overwriting purposes
-        return [[0 for _ in range(self.screen_width // 16)] for _ in range(self.screen_height // 16)]
     # ------- End of Random Level Generator Mode (unused) -------
 
 # ------- Helper Functions -------
@@ -361,6 +356,8 @@ class Game:
             if not isinstance(entity_move, (Tank, EnemyTank, Mirror, Water)):
                 self.map_database[curr_y][curr_x] = 0
                 # pyxel.play(2, 2)
+            
+            self.duplicate_map_database[curr_y][curr_x] = 0 # Handle collisions for bullet overwrites. No need extra checks since this duplicate map_database is only for bullets
 
             is_from.is_shoot = False # to keep the bullet moving/recursing from a tank or enemy tank
 
@@ -373,7 +370,6 @@ class Game:
             # pyxel.play(2, 2)
             bullet1.is_shoot = False
             bullet2.is_shoot = False
-            print('Suspect')
 
             if bullet1.label == 'player' or bullet2.label == 'player': # If one of them is the player
                 # Note: Same logic as when a bullet hits a stone
@@ -391,45 +387,8 @@ class Game:
 
             self.map_database[new_y][new_x] = 0
             self.map_database[curr_y][curr_x] = 0
-            return
-        
-    def handle_bullet_overwrite_for_enemy_tanks(self, curr_x: int, curr_y: int, new_x: int, new_y: int, is_from: EnemyTank | Bullet):
-        if isinstance(self.map_database[curr_y][curr_x], Bullet): # Edge case wherein the bullet is stuck in the screen before hitting the tank
-            self.map_database[curr_y][curr_x] = 0
-
-        self.duplicate_map_database = self.generate_duplicate_map_database()
-
-        if type(is_from) == EnemyTank:
-            self.duplicate_map_database[new_y][new_x] = Bullet(new_x, new_y, is_from.bullet.direction, True, is_from.bullet.label)
-            self.movement(is_from.bullet.direction, 'bullet', new_x, new_y, is_from)
-
-        if type(is_from) == Bullet:
-            self.duplicate_map_database[new_y][new_x] = Bullet(new_x, new_y, is_from.direction, True, is_from.label)
-            self.movement(is_from.direction, 'bullet', new_x, new_y, is_from)
-
-        self.should_overwrite_bullet = True
-
-    def handle_bullet_overwrite_for_water(self, curr_x: int, curr_y: int, new_x: int, new_y: int, is_from: Tank | EnemyTank | Bullet):
-        if isinstance(self.map_database[curr_y][curr_x], Bullet): # Edge case wherein the bullet is stuck in the screen before hitting the tank
-            self.map_database[curr_y][curr_x] = 0
-        
-        if type(is_from) == Tank:
-            if (new_x, new_y) not in self.bullet_draw:
-                self.bullet_draw.append((new_x, new_y))
-            if pyxel.frame_count % 5 == 0:
-                self.movement(is_from.bullet.direction, 'bullet', new_x, new_y, is_from)     
-
-        if type(is_from) == EnemyTank:
-            if (new_x, new_y) not in self.bullet_draw:
-                self.bullet_draw.append((new_x, new_y))
-            if pyxel.frame_count % 20 == 0:
-                self.movement(is_from.bullet.direction, 'bullet', new_x, new_y, is_from)
-        
-        if type(is_from) == Bullet:
-            if (new_x, new_y) not in self.bullet_draw:
-                self.bullet_draw.append((new_x, new_y))
-            if pyxel.frame_count % 5 == 0:    
-                self.movement(is_from.direction, 'bullet', new_x, new_y, is_from)
+            self.duplicate_map_database[new_y][new_x] = 0
+            self.duplicate_map_database[curr_y][curr_x] = 0
 
     def handle_bullet_damage(self, curr_x: int, curr_y: int, new_x: int, new_y: int, is_from: Bullet | Tank | EnemyTank): # I can shorten this pa, but I just want to see each test cases
         entity_on_new_point = self.map_database[new_y][new_x]
@@ -438,7 +397,7 @@ class Game:
             if type(is_from) == EnemyTank and is_from.bullet.label != entity_on_new_point.bullet.label:
                 print('Player tank hit by enemy tank bullet', is_from.label, entity_on_new_point.bullet.label)
                 entity_on_new_point.hp -= 1
-                self.handle_collision(is_from.bullet.direction, 'bullet', new_x, new_y, is_from)
+                self.handle_collision(is_from.bullet.direction, 'bullet', curr_x, curr_y, is_from)
                 print(entity_on_new_point.hp)
 
             if type(is_from) == Tank and is_from.bullet.label == entity_on_new_point.bullet.label:
@@ -455,7 +414,7 @@ class Game:
                 else:
                     print('Player tank hit by enemy tank bullet', is_from.label, entity_on_new_point.bullet.label)
                     entity_on_new_point.hp -= 1
-                    self.handle_collision(is_from.direction, 'bullet', new_x, new_y, is_from)
+                    self.handle_collision(is_from.direction, 'bullet', curr_x, curr_y, is_from)
             # -- End of self.keep_bullet_shooting() --
 
         elif type(entity_on_new_point) == EnemyTank:
@@ -466,14 +425,14 @@ class Game:
 
             if type(is_from) == EnemyTank:
                 print('Enemy tank hit by enemy tank bullet (should pass through)')
-                self.handle_bullet_overwrite_for_enemy_tanks(curr_x, curr_y, new_x, new_y, is_from)
+                self.move_bullet(is_from.bullet.direction, curr_x, curr_y, new_x, new_y, is_from)
 
             # -- This is when the self.keep_bullet_shooting() is called, i.e. Bullets are moved from dead tanks --
             if type(is_from) == Bullet: 
                 if is_from.label != 'player':
                     print('Enemy tank hit by enemy tank bullet', is_from.label, entity_on_new_point.label)
-                    self.handle_bullet_overwrite_for_enemy_tanks(curr_x, curr_y, new_x, new_y, is_from)
-                
+                    self.move_bullet(is_from.direction, curr_x, curr_y, new_x, new_y, is_from)
+
                 if is_from.label == 'player':
                     print('Enemy tank hit by player tank bullet', is_from.label, entity_on_new_point.label)
                     entity_on_new_point.hp -= 1
@@ -483,9 +442,6 @@ class Game:
         elif type(entity_on_new_point) == Brick:
             entity_on_new_point.hp -= 1
             self.handle_collision(is_from.direction, 'bullet', curr_x, curr_y, is_from)
-
-        elif type(entity_on_new_point) == Water:
-            self.handle_bullet_overwrite_for_water(curr_x, curr_y, new_x, new_y, is_from)
 
     def handle_bullet_to_mirror_result(self, direction: Literal['left', 'right', 'up', 'down'], curr_x: int, curr_y: int, new_x: int, new_y: int, is_from: Bullet | Tank | EnemyTank, how_many_times_is_mirror_called: int, prev_mirror_call_pos: tuple[int, int], last_bullet_pos_before_hitting_mirror: tuple[int, int]):
         mirror = self.map_database[new_y][new_x]
@@ -503,17 +459,37 @@ class Game:
             self.movement(direction, "bullet", prev_mirror_call_pos[0], prev_mirror_call_pos[1], is_from, True, orient, how_many_times_is_mirror_called + 1, (mirror.x, mirror.y))
 
     def move_bullet(self, direction: Literal['left', 'right', 'up', 'down'], curr_x: int, curr_y: int, new_x: int, new_y: int, is_from: Tank | EnemyTank | Bullet):
+        entity_move = self.map_database[new_y][new_x]
+        
+        # Bullets fired from alive tanks
         if isinstance(is_from, (Tank, EnemyTank)):
-            self.map_database[new_y][new_x] = Bullet(new_x, new_y, direction, True, is_from.bullet.label)
+            if isinstance(entity_move, EnemyTank) and isinstance(is_from, EnemyTank): # Friendly fire enemy tanks case, should have bullet overwrite
+                self.duplicate_map_database[new_y][new_x] = Bullet(new_x, new_y, direction, True, is_from.bullet.label)
+            elif isinstance(entity_move, Water): # Water case, should have bullet overwrite
+                self.duplicate_map_database[new_y][new_x] = Bullet(new_x, new_y, direction, True, is_from.bullet.label)
+            else: # Normal movement
+                self.map_database[new_y][new_x] = Bullet(new_x, new_y, direction, True, is_from.bullet.label)
+
             is_from.bullet.x, is_from.bullet.y, is_from.bullet.direction = (new_x, new_y, direction)
         
+        # Bullets fired from dead tanks
         if isinstance(is_from, Bullet):
-            self.map_database[new_y][new_x] = Bullet(new_x, new_y, direction, True, is_from.label)
+            if isinstance(entity_move, EnemyTank) and isinstance(is_from, EnemyTank): # Friendly fire enemy tanks case, should have bullet overwrite
+                self.duplicate_map_database[new_y][new_x] = Bullet(new_x, new_y, direction, True, is_from.label)
+            elif isinstance(entity_move, Water): # Water case, should have bullet overwrite
+                self.duplicate_map_database[new_y][new_x] = Bullet(new_x, new_y, direction, True, is_from.label)
+            else: # Normal movement
+                self.map_database[new_y][new_x] = Bullet(new_x, new_y, direction, True, is_from.label)
+
             is_from.x, is_from.y, is_from.direction = (new_x, new_y, direction)
 
         # Edge case: If the bullet just spawned, this will prevent setting the tank to 0
         if isinstance(self.map_database[curr_y][curr_x], Bullet):
             self.map_database[curr_y][curr_x] = 0
+
+        # Remove previous bullets that have been overwritten
+        if isinstance(self.duplicate_map_database[curr_y][curr_x], Bullet):
+            self.duplicate_map_database[curr_y][curr_x] = 0
 
     def move_tanks(self, direction: Literal['left', 'right', 'up', 'down'], entity: Literal['player', 'enemy'], curr_x: int, curr_y: int, new_x: int, new_y: int):
         # If the new point is safe to move into, move the entity to the new point
@@ -573,8 +549,7 @@ class Game:
             if entity == 'enemy' or entity == 'player':
                 self.handle_collision(direction, entity, curr_x, curr_y, is_from)
             if entity == 'bullet':
-                if pyxel.frame_count % 5 == 0:
-                    self.handle_bullet_damage(curr_x, curr_y, new_x, new_y, is_from)
+                self.move_bullet(direction, curr_x, curr_y, new_x, new_y, is_from)
 
         elif isinstance(self.map_database[new_y][new_x], Bullet):
             if entity == 'bullet': # Bullet finds another bullet, both bullets should disappear
@@ -657,37 +632,36 @@ class Game:
             if pyxel.btnp(pyxel.KEY_T): # debug key, checks map state mid-game
                 print(self.map_database)
 
-            if self.hp > 0 and not self.is_win and not self.is_gameover: # don't move if player tank dead already # instead of checking self_tank_hp, this allows for ai to move when the player dies and still has lives left.
-                if pyxel.btn(pyxel.KEY_LEFT):
-                    # print('left pressed!', self.player_tank)
-                    if pyxel.frame_count % 4 == 0:
-                        self.movement('left', 'player', self.player_tank.x, self.player_tank.y, self.player_tank)
+            if pyxel.btn(pyxel.KEY_LEFT):
+                # print('left pressed!', self.player_tank)
+                if pyxel.frame_count % 4 == 0:
+                    self.movement('left', 'player', self.player_tank.x, self.player_tank.y, self.player_tank)
 
-                elif pyxel.btn(pyxel.KEY_RIGHT):
-                    # print('right pressed!', self.player_tank)
-                    if pyxel.frame_count % 4 == 0:
-                        self.movement('right', 'player', self.player_tank.x, self.player_tank.y, self.player_tank)
+            elif pyxel.btn(pyxel.KEY_RIGHT):
+                # print('right pressed!', self.player_tank)
+                if pyxel.frame_count % 4 == 0:
+                    self.movement('right', 'player', self.player_tank.x, self.player_tank.y, self.player_tank)
 
-                elif pyxel.btn(pyxel.KEY_UP):
-                    # print('up pressed!', self.player_tank)
-                    if pyxel.frame_count % 4 == 0:
-                        self.movement('up', 'player', self.player_tank.x, self.player_tank.y, self.player_tank)
+            elif pyxel.btn(pyxel.KEY_UP):
+                # print('up pressed!', self.player_tank)
+                if pyxel.frame_count % 4 == 0:
+                    self.movement('up', 'player', self.player_tank.x, self.player_tank.y, self.player_tank)
 
-                elif pyxel.btn(pyxel.KEY_DOWN):
-                    # print('down pressed!', self.player_tank)
-                    if pyxel.frame_count % 4 == 0:
-                        self.movement('down', 'player', self.player_tank.x, self.player_tank.y, self.player_tank)
-                
-                if pyxel.btnp(pyxel.KEY_SPACE) and not self.player_tank.is_shoot and pyxel.frame_count > self.frames_before_starting: #  # Uncomment this later. This prevents the player from shooting before the game starts
-                    # pyxel.play(0, 0)
-                    self.player_tank.bullet.x, self.player_tank.bullet.y, self.player_tank.bullet.direction = self.player_tank.x, self.player_tank.y, self.player_tank.direction
-                    self.player_tank.is_shoot = True
-                    self.player_tank.bullet.is_shoot = True
+            elif pyxel.btn(pyxel.KEY_DOWN):
+                # print('down pressed!', self.player_tank)
+                if pyxel.frame_count % 4 == 0:
+                    self.movement('down', 'player', self.player_tank.x, self.player_tank.y, self.player_tank)
+            
+            if pyxel.btnp(pyxel.KEY_SPACE) and not self.player_tank.is_shoot and pyxel.frame_count > self.frames_before_starting: #  # Uncomment this later. This prevents the player from shooting before the game starts
+                # pyxel.play(0, 0)
+                self.player_tank.bullet.x, self.player_tank.bullet.y, self.player_tank.bullet.direction = self.player_tank.x, self.player_tank.y, self.player_tank.direction
+                self.player_tank.is_shoot = True
+                self.player_tank.bullet.is_shoot = True
 
-                if self.player_tank.is_shoot and self.player_tank.bullet.is_shoot:
-                    self.movement(self.player_tank.bullet.direction, 'bullet', self.player_tank.bullet.x, self.player_tank.bullet.y, self.player_tank)
-                
-                self.ai_tanks_moves()
+            if self.player_tank.is_shoot and self.player_tank.bullet.is_shoot:
+                self.movement(self.player_tank.bullet.direction, 'bullet', self.player_tank.bullet.x, self.player_tank.bullet.y, self.player_tank)
+            
+            self.ai_tanks_moves()
 
             self.keep_bullet_shooting()
 
@@ -742,15 +716,15 @@ class Game:
                     for forest in self.forest_draw: # Overwriting background with the bushes
                         pyxel.blt(forest[0]*16, forest[1]*16, 0, 48, 48, 16, 16, 0)
 
-            # Overwriting water with bullets
-            for bullet in self.previous_bullet_positions:
-                pyxel.blt(bullet[0]*16, bullet[1]*16, 0, 32, 48, 16, 16, 0)
+            # # Overwriting water with bullets
+            # for bullet in self.previous_bullet_positions:
+            #     pyxel.blt(bullet[0]*16, bullet[1]*16, 0, 32, 48, 16, 16, 0)
 
-            for bullet in self.bullet_draw:
-                pyxel.blt(bullet[0]*16, bullet[1]*16, 0, 0, 16, 16, 16, 0) 
-                self.bullet_draw.remove(bullet)
+            # for bullet in self.bullet_draw:
+            #     pyxel.blt(bullet[0]*16, bullet[1]*16, 0, 0, 16, 16, 16, 0) 
+            #     self.bullet_draw.remove(bullet)
 
-            self.previous_bullet_positions = self.bullet_draw.copy()
+            # self.previous_bullet_positions = self.bullet_draw.copy()
                         
         else:
             if self.is_gameover:
@@ -759,15 +733,10 @@ class Game:
                 pyxel.text((self.screen_width // 2) - 20, (self.screen_height // 2) - 20, 'YOU WIN!', 1)
 
         # Overwriting enemy tanks with their enemy tank bullets
-        if self.should_overwrite_bullet:
-            for row in self.duplicate_map_database:
-                for entity in row:
-                    if type(entity) == Bullet:
-                        print(self.duplicate_map_database)
-                        pyxel.blt(entity.x*16, entity.y*16, 0, 0, 16, 16, 16, 0)
-                        self.should_overwrite_bullet = False
-
-                        self.duplicate_map_database[entity.y][entity.x] = 0
+        for row in self.duplicate_map_database:
+            for entity in row:
+                if type(entity) == Bullet:
+                    pyxel.blt(entity.x*16, entity.y*16, 0, 0, 16, 16, 16, 0)
 
         # Countdown timer before starting the game
         if self.frames_before_starting - pyxel.frame_count >= 0:
