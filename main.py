@@ -1,3 +1,4 @@
+import os
 import pyxel
 from dataclasses import dataclass
 import pyxelgrid # type: ignore
@@ -56,21 +57,32 @@ class Game:
     def __init__(self):
         self.screen_width = 400
         self.screen_height = 272
-        self.level = 1
+        self.internal_level = 1
         self.hp = 3
-
+        self.map_loaded = False
+        self.level_list = [f for f in os.listdir('assets/levels') if os.path.isfile('assets/levels/'+f) and f.endswith('.json')]
         pyxel.init(self.screen_width, self.screen_height, fps=60)
         pyxel.load('assets/assets.pyxres')
 
-        self.init_gamestate() 
+        self.load() 
         
+        print(self.level_list)
         pyxel.run(self.update, self.draw)
 
 # ------- Generator Functions -------
-    def init_gamestate(self):
-        with open('assets/levels/level' + str(self.level) + '.json') as self.map_file:
-            self.map_load = json.load(self.map_file)
+    def load(self):
+        try:
+            with open('assets/levels/' + self.level_list[self.internal_level-1]) as self.map_file:
+                print(f'loaded! {self.level_list[self.internal_level-1]}')
+                self.map_load = json.load(self.map_file)
+                self.map_loaded = True
+                self.init_gamestate() 
+        except:
+            print(f'ERROR! Map {self.level_list[self.internal_level-1]} is an invalid file!')
+            self.internal_level += 1
+            
 
+    def init_gamestate(self):
         self.is_gameover = False
         self.is_win = False
         self.undraw = False
@@ -88,6 +100,7 @@ class Game:
         self.spawnpoint: tuple[int,int]
         
         # Enemy tank spawning
+        self.random_label = 33
         self.concurrent_enem_spawn: int = 0
         self.dedicated_enem_spawn: list[tuple[int, int]] = []
 
@@ -105,9 +118,9 @@ class Game:
         self.should_overwrite_bullet = False
 
         # pyxel.playm(0, loop=True) # :3 
-
+        self.cheat_input: list['str'] = []
         self.generate_level()
-        self.generate_enem_tank()
+        #self.generate_enem_tank()
 
     # Main priority in generation is to ensure that the tanks and stones do not overlap each other
     def generate_level(self):
@@ -235,18 +248,17 @@ class Game:
         self.map_database[0][0] = self.player_tank
 
     def generate_enem_tank(self):
-        #print(self.concurrent_enem_spawn)
-        random_label = 33
-        #if self.concurrent_enem_spawn < self.num_tanks: this is extremely broken atm
-        for _ in range(self.num_tanks):
+        print(self.concurrent_enem_spawn)
+        if self.concurrent_enem_spawn < self.num_tanks:
+        #for _ in range(self.num_tanks):
             pick = randint(0,len(self.dedicated_enem_spawn)-1)
             x_i, y_i = self.dedicated_enem_spawn[pick]
 
             if self.check_if_pos_is_unique(x_i, y_i):
                 #print(x_i, y_i)
-                enem_tank = EnemyTank(x_i, y_i, 'up', 1, 1, False, Bullet(x_i, y_i, 'up', False, chr(random_label)), chr(random_label)) # we should generate randomize labels infinitely to prevent bug in infinitely many tanks generation
+                enem_tank = EnemyTank(x_i, y_i, 'up', 1, 1, False, Bullet(x_i, y_i, 'up', False, chr(self.random_label)), chr(self.random_label)) # we should generate randomize labels infinitely to prevent bug in infinitely many tanks generation
                 self.map_database[y_i][x_i] = enem_tank
-                random_label += 1
+                self.random_label += 1
                 self.concurrent_enem_spawn += 1
             else:
                 while not self.check_if_pos_is_unique(x_i, y_i):
@@ -254,11 +266,11 @@ class Game:
                     x_i, y_i = self.dedicated_enem_spawn[pick]
                     
                     if self.check_if_pos_is_unique(x_i, y_i):
-                        enem_tank = EnemyTank(x_i, y_i, 'up', 1, 1, False, Bullet(x_i, y_i, 'up', False, chr(random_label)), chr(random_label)) # we should generate randomize labels infinitely to prevent bug in infinitely many tanks generation
+                        enem_tank = EnemyTank(x_i, y_i, 'up', 1, 1, False, Bullet(x_i, y_i, 'up', False, chr(self.random_label)), chr(self.random_label)) # we should generate randomize labels infinitely to prevent bug in infinitely many tanks generation
                         self.map_database[y_i][x_i] = enem_tank
                         break
 
-                    random_label += 1
+                    self.random_label += 1
                     self.concurrent_enem_spawn += 1
 
     def generate_duplicate_map_database(self) -> list[list[Stone | Brick | Tank | EnemyTank | Bullet | Mirror | int]]: # This is for overwriting purposes
@@ -622,11 +634,49 @@ class Game:
                         self.visited_enemy_tanks_so_far.add(entity.label)
         self.visited_enemy_tanks_so_far.clear()
 
+    def cheat(self):
+        if not self.cheat_input:
+            self.timer = pyxel.frame_count + 180
 
+        if self.cheat_input == ['UP','UP','DOWN','DOWN','LEFT','RIGHT','LEFT','RIGHT','B','A','ENTER'] and pyxel.frame_count < self.timer:
+            self.hp += 1
+            self.timer = 0
+            print('CHEATCODE ACTIVATED!, current lives:' + str(self.hp))
+        elif self.cheat_input == ['DEBUG','DEBUG','DEBUG','DEBUG','DEBUG',] and pyxel.frame_count < self.timer:
+            self.internal_level = 1
+            self.level_list.clear()
+            self.level_list = ['debug_levels/' + f for f in os.listdir('assets/levels/debug_levels') if os.path.isfile('assets/levels/debug_levels/'+f) and f.endswith('.json')]
+            self.map_loaded = False
+            print('DEBUG ENABLED!')
+            self.load()
+        elif pyxel.frame_count > self.timer:
+            self.cheat_input.clear()
+        else:
+            if pyxel.btnp(pyxel.KEY_UP):
+                self.cheat_input.append('UP')
+            elif pyxel.btnp(pyxel.KEY_DOWN):
+                self.cheat_input.append('DOWN')
+            elif pyxel.btnp(pyxel.KEY_LEFT):
+                self.cheat_input.append('LEFT')
+            elif pyxel.btnp(pyxel.KEY_RIGHT):
+                self.cheat_input.append('RIGHT')
+            elif pyxel.btnp(pyxel.KEY_B):
+                self.cheat_input.append('B')
+            elif pyxel.btnp(pyxel.KEY_A):
+                self.cheat_input.append('A')
+            elif pyxel.btnp(pyxel.KEY_RETURN):
+                self.cheat_input.append('ENTER')
+            elif pyxel.btnp(pyxel.KEY_DELETE):
+                self.cheat_input.append('DEBUG')
 
     def update(self):
-        #if pyxel.frame_count % 180 == 0: #enemy tank spawns in an interval of 3 seconds, maybe this can be configured in the map file for increasing difficulty
-            #self.generate_enem_tank() #this code is extremely broken atm
+        if not self.map_loaded:
+            self.load()
+
+        self.cheat()
+        if pyxel.frame_count % 180 == 0 and self.concurrent_enem_spawn != self.num_tanks: #enemy tank spawns in an interval of 3 seconds, maybe this can be configured in the map file for increasing difficulty
+            self.generate_enem_tank()
+
         if self.player_tank.hp == 0 and pyxel.btnp(pyxel.KEY_R):
             self.player_tank = Tank(self.spawnpoint[0], self.spawnpoint[1], 'right', 1, 1, False, Bullet(0, 0, 'right', False, 'player'))
             self.map_database[self.spawnpoint[1]][self.spawnpoint[0]] = self.player_tank
@@ -637,17 +687,19 @@ class Game:
                 pyxel.stop() # stop music
 
             if self.is_gameover and pyxel.btnp(pyxel.KEY_R):
-                self.level = 1
-                self.init_gamestate()
+                self.internal_level = 1
+                self.map_loaded = False
+                self.load()
             elif self.is_win and pyxel.btnp(pyxel.KEY_RETURN):
-                self.level += 1
-                self.init_gamestate()
+                self.internal_level += 1
+                self.map_loaded = False
+                self.load()
 
         if not self.undraw:
             if pyxel.btnp(pyxel.KEY_Q):
                 pyxel.quit()
 
-            if pyxel.btnp(pyxel.KEY_F1): # debug key, instant game over
+            if pyxel.btnp(pyxel.KEY_F1): # debug key, instant tank death
                 print(self.map_database[self.player_tank.y][self.player_tank.x])
                 tanko = self.map_database[self.player_tank.y][self.player_tank.x]
                 print('BOOM', tanko)
@@ -656,7 +708,7 @@ class Game:
             
             if pyxel.btnp(pyxel.KEY_T): # debug key, checks map state mid-game
                 print(self.map_database)
-
+            
             if self.hp > 0 and not self.is_win and not self.is_gameover: # don't move if player tank dead already # instead of checking self_tank_hp, this allows for ai to move when the player dies and still has lives left.
                 if pyxel.btn(pyxel.KEY_LEFT):
                     # print('left pressed!', self.player_tank)
@@ -677,7 +729,7 @@ class Game:
                     # print('down pressed!', self.player_tank)
                     if pyxel.frame_count % 4 == 0:
                         self.movement('down', 'player', self.player_tank.x, self.player_tank.y, self.player_tank)
-                
+
                 if pyxel.btnp(pyxel.KEY_SPACE) and not self.player_tank.is_shoot and pyxel.frame_count > self.frames_before_starting: #  # Uncomment this later. This prevents the player from shooting before the game starts
                     # pyxel.play(0, 0)
                     self.player_tank.bullet.x, self.player_tank.bullet.y, self.player_tank.bullet.direction = self.player_tank.x, self.player_tank.y, self.player_tank.direction
@@ -754,16 +806,16 @@ class Game:
                         
         else:
             if self.is_gameover:
-                pyxel.text((self.screen_width // 2) - 20, (self.screen_height // 2) - 20, 'GAME OVER', 1) # Temporary values. might have to make a game over splash screen instead since the text is small
+                pyxel.text((self.screen_width // 2) - 20, (self.screen_height // 2) - 20, 'GAME OVER', 7) # Temporary values. might have to make a game over splash screen instead since the text is small
             elif self.is_win:
-                pyxel.text((self.screen_width // 2) - 20, (self.screen_height // 2) - 20, 'YOU WIN!', 1)
+                pyxel.text((self.screen_width // 2) - 20, (self.screen_height // 2) - 20, 'YOU WIN!', 7)
 
         # Overwriting enemy tanks with their enemy tank bullets
         if self.should_overwrite_bullet:
             for row in self.duplicate_map_database:
                 for entity in row:
                     if type(entity) == Bullet:
-                        print(self.duplicate_map_database)
+                        #print(self.duplicate_map_database)
                         pyxel.blt(entity.x*16, entity.y*16, 0, 0, 16, 16, 16, 0)
                         self.should_overwrite_bullet = False
 
@@ -773,13 +825,13 @@ class Game:
         if self.frames_before_starting - pyxel.frame_count >= 0:
             countdown = self.frames_before_starting - pyxel.frame_count
             if countdown >= 180:
-                pyxel.text((self.screen_width // 2), (self.screen_height // 2), '3', 1)
+                pyxel.text((self.screen_width // 2), (self.screen_height // 2), '3', 7)
             elif countdown >= 120:
-                pyxel.text((self.screen_width // 2), (self.screen_height // 2), '2', 1)
+                pyxel.text((self.screen_width // 2), (self.screen_height // 2), '2', 7)
             elif countdown >= 60:
-                pyxel.text((self.screen_width // 2), (self.screen_height // 2), '1', 1)
+                pyxel.text((self.screen_width // 2), (self.screen_height // 2), '1', 7)
             else:
-                pyxel.text((self.screen_width // 2), (self.screen_height // 2), 'GO!', 1)
+                pyxel.text((self.screen_width // 2), (self.screen_height // 2), 'GO!', 7)
 
         # The deeper the code here, the more it will be drawn on top of the other entities
                 
