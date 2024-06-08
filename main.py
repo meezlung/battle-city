@@ -53,6 +53,10 @@ class Forest:
     x: int
     y: int
 
+@dataclass
+class HomeBase(Brick):
+    pass
+
 class Game:
     def __init__(self):
         self.screen_width = 400
@@ -103,12 +107,13 @@ class Game:
         self.concurrent_enem_spawn: int = 0
         self.dedicated_enem_spawn: list[tuple[int, int]] = []
 
-        self.duplicate_map_database: list[list[Stone | Brick | Tank | EnemyTank | Bullet | Mirror | int]] = [[0 for _ in range(self.screen_width // 16)] for _ in range(self.screen_height // 16)]
+        self.duplicate_map_database: list[list[Stone | Brick | Tank | EnemyTank | Bullet | Mirror | Water | Forest | int]] = [[0 for _ in range(self.screen_width // 16)] for _ in range(self.screen_height // 16)] # Overwriting objects with bullets
         self.forest_draw: list[tuple[int, int]] = [] # Overwriting purposes
 
         # Helpful checks
         self.visited_enemy_tanks_so_far: set[str] = set() 
         self.visited_bullets_so_far: set[str] = set()
+        self.duplicate_visited_bullets_so_far: set[str] = set()
 
         # Some helpful bullet logic
         self.is_shoot_bullet = False
@@ -130,7 +135,8 @@ class Game:
                 if entity[1] == 2:
                     self.dedicated_enem_spawn.append((entity[0],row[0]))
                 if entity[1] == 3:
-                    pass # player's home base not yet implemented
+                    homebase = HomeBase(entity[0], row[0], 1)
+                    self.map_database[row[0]][entity[0]] = homebase
                 if entity[1] == 4:
                     stone = Stone(entity[0], row[0])
                     self.map_database[row[0]][entity[0]] = stone
@@ -148,6 +154,7 @@ class Game:
                     self.map_database[row[0]][entity[0]] = water
                 if entity[1] == 9:
                     self.forest_draw.append((entity[0],row[0]))
+
         self.map_file.close()
     # ------- End of Generator Functions -------
 
@@ -161,60 +168,6 @@ class Game:
             if self.check_if_pos_is_unique(x_i, y_i):
                 stone = Stone(x_i, y_i)
                 self.map_database[y_i][x_i] = stone
-
-    # -- Debugging Functions --
-    def generate_mirrors_to_kill_player(self):
-        x_i = 5
-        y_i = 5
-
-        if self.check_if_pos_is_unique(x_i, y_i):
-            self.map_database[y_i][x_i] = Mirror(x_i, y_i, 'NE')
-
-            if self.check_if_pos_is_unique(x_i + 8, y_i):
-                self.map_database[y_i][x_i + 8] = Mirror(x_i + 8, y_i, 'SE')
-
-                if self.check_if_pos_is_unique(x_i + 8, y_i + 4):
-                    self.map_database[y_i + 4][x_i + 8] = Mirror(x_i + 8, y_i + 4, 'NE')
-
-                    if self.check_if_pos_is_unique(x_i, y_i + 4):
-                        self.map_database[y_i + 4][x_i] = Mirror(x_i, y_i + 4, 'SE')
-
-    def generate_chained_mirrors(self):
-        x_i = randint(0, 24)
-        y_i = randint(0, 15)
-
-        if self.check_if_pos_is_unique(x_i, y_i):
-            self.map_database[y_i][x_i] = Mirror(x_i, y_i, 'NE')
-
-            if self.check_if_pos_is_unique(x_i + 1, y_i):
-                self.map_database[y_i][x_i + 1] = Mirror(x_i + 1, y_i, 'SE')   
-                
-                if self.check_if_pos_is_unique(x_i + 1, y_i + 1):
-                    self.map_database[y_i + 1][x_i + 1] = Mirror(x_i + 1, y_i + 1, 'NE')     
-
-    def generate_snake_mirrors(self):
-        x_i = 5
-        y_i = 5
-
-        if self.check_if_pos_is_unique(x_i, y_i):
-            self.map_database[y_i][x_i] = Mirror(x_i, y_i, 'NE')
-
-            if self.check_if_pos_is_unique(x_i + 1, y_i):
-                self.map_database[y_i][x_i + 1] = Mirror(x_i + 1, y_i, 'NE')
-
-                if self.check_if_pos_is_unique(x_i + 1, y_i - 1):
-                    self.map_database[y_i - 1][x_i + 1] = Mirror(x_i + 1, y_i - 1, 'NE')
-                    
-                    if self.check_if_pos_is_unique(x_i + 2, y_i - 1):
-                        self.map_database[y_i - 1][x_i + 2] = Mirror(x_i + 2, y_i - 1, 'NE')
-    
-    def generate_two_self_enem_tank(self):
-        enem_tank = EnemyTank(5, 5, 'right', 1, 1, False, Bullet(5, 5, 'up', False, 'enemy1'), 'enemy1')
-        self.map_database[5][5] = enem_tank
-
-        enem_tank = EnemyTank(10, 5, 'up', 1, 1, False, Bullet(10, 5, 'up', False, 'enemy2'), 'enemy2')
-        self.map_database[5][10] = enem_tank
-    # -- End of Debugging Functions --
 
     def generate_bricks(self):
         num_bricks: int = randint(5, 10)
@@ -299,6 +252,10 @@ class Game:
                         destroyposrow = self.map_database.index(row)
                         destroypos = self.map_database[destroyposrow].index(entity)
                         self.map_database[destroyposrow][destroypos] = 0
+                        if isinstance(entity, (HomeBase)):
+                            self.is_gameover = True
+                            self.frames = pyxel.frame_count + 180
+                        
                         # pyxel.play(2, 2)
 
     def check_rem_tanks(self):
@@ -320,18 +277,18 @@ class Game:
         return True
 
     # Check if bullet is still in the game, if it is, keep it moving. Note: This depends on the Bullet itself.
-    def keep_bullet_shooting(self):
-        for row in self.map_database:
+    def keep_bullet_shooting(self, database: list[list[Stone | Brick | Tank | EnemyTank | Bullet | Mirror | Water | Forest | int]], visited_bullets: set[str]):
+        for row in database:
             for bullet in row:
                 if isinstance(bullet, Bullet):
-                    if bullet.label not in self.visited_bullets_so_far:
+                    if bullet.label not in visited_bullets:
                         if bullet.is_shoot:
                             if self.is_bullet_from_dead_tank(bullet): # We need to limit keep_bullet_shooting so that it only moves bullets that are from dead tanks
                                 print('Coming from dead tank')
                                 if pyxel.frame_count % 5 == 0:
                                     self.movement(bullet.direction, 'bullet', bullet.x, bullet.y, bullet)
-                                    self.visited_bullets_so_far.add(bullet.label)
-        self.visited_bullets_so_far.clear()
+                                    visited_bullets.add(bullet.label)
+        visited_bullets.clear()
 
     def stop_shooting_if_bullet_collided_with_each_other(self, bullet1: Bullet, bullet2: Bullet):
         for row in self.map_database:
@@ -449,9 +406,8 @@ class Game:
                     self.handle_collision(is_from.direction, 'bullet', curr_x, curr_y, is_from)
             # -- End of self.keep_bullet_shooting() --
 
-        elif type(entity_on_new_point) == Brick:
+        elif type(entity_on_new_point) == Brick or type(entity_on_new_point) == HomeBase:
             entity_on_new_point.hp -= 1
-            self.handle_collision(is_from.direction, 'bullet', curr_x, curr_y, is_from)
 
     def handle_bullet_to_mirror_result(self, direction: Literal['left', 'right', 'up', 'down'], curr_x: int, curr_y: int, new_x: int, new_y: int, is_from: Bullet | Tank | EnemyTank, how_many_times_is_mirror_called: int, prev_mirror_call_pos: tuple[int, int], last_bullet_pos_before_hitting_mirror: tuple[int, int]):
         mirror = self.map_database[new_y][new_x]
@@ -538,7 +494,7 @@ class Game:
         elif isinstance(self.map_database[new_y][new_x], Stone):
             self.handle_collision(direction, entity, curr_x, curr_y, is_from)
 
-            if isinstance(self.map_database[new_y][new_x], Brick): # Under the stone, since Brick inherits from Stone
+            if isinstance(self.map_database[new_y][new_x], (Brick, HomeBase)): # Under the stone, since Brick inherits from Stone
                 if entity == 'bullet': # If a bullet discovers a Brick in front of it, subtract hp of brick
                     self.handle_bullet_damage(curr_x, curr_y, new_x, new_y, is_from)
 
@@ -713,7 +669,8 @@ class Game:
             
             self.ai_tanks_moves()
 
-            self.keep_bullet_shooting()
+            self.keep_bullet_shooting(self.map_database, self.visited_bullets_so_far)
+            self.keep_bullet_shooting(self.duplicate_map_database, self.duplicate_visited_bullets_so_far) # Keep updating overwritten bullets even from dead tanks
 
             self.eliminate_no_hp_entity()
             
@@ -762,19 +719,11 @@ class Game:
                             pyxel.blt(entity.x*16, entity.y*16, 0, 48, 16, 16, 16, 0)
                     elif type(entity) == Water:
                         pyxel.blt(entity.x*16, entity.y*16, 0, 32, 48, 16, 16, 0)
+                    elif type(entity) == HomeBase:
+                        pyxel.blt(entity.x*16, entity.y*16, 0, 0, 64, 16, 16, 0)
                     
                     for forest in self.forest_draw: # Overwriting background with the bushes
                         pyxel.blt(forest[0]*16, forest[1]*16, 0, 48, 48, 16, 16, 0)
-
-            # # Overwriting water with bullets
-            # for bullet in self.previous_bullet_positions:
-            #     pyxel.blt(bullet[0]*16, bullet[1]*16, 0, 32, 48, 16, 16, 0)
-
-            # for bullet in self.bullet_draw:
-            #     pyxel.blt(bullet[0]*16, bullet[1]*16, 0, 0, 16, 16, 16, 0) 
-            #     self.bullet_draw.remove(bullet)
-
-            # self.previous_bullet_positions = self.bullet_draw.copy()
                         
         else:
             if self.is_gameover:
