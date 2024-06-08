@@ -55,10 +55,10 @@ class Forest:
 
 class Game:
     def __init__(self):
-        self.screen_width = 400
+        self.screen_width = 464
         self.screen_height = 272
-        self.internal_level = 1
-        self.hp = 3
+        self.internal_level = 11
+        self.hp = 2
         self.map_loaded = False
         self.level_list = [f for f in os.listdir('assets/levels') if os.path.isfile('assets/levels/'+f) and f.endswith('.json')]
         pyxel.init(self.screen_width, self.screen_height, fps=60)
@@ -82,13 +82,20 @@ class Game:
             self.internal_level += 1
 
     def init_gamestate(self):
+        self.level = self.map_load["level"]
+        self.stage_name = self.map_load["stage_name"]
+        self.tutorial = self.map_load["tutorial"]
+        self.powerup_time_limit = self.map_load["powerup_req"]
         self.is_gameover = False
         self.is_win = False
         self.undraw = False
+        self.powerup_can_get = True
+        self.powerup_got = False
+        self.time = 0
         self.frames_before_starting = pyxel.frame_count + 200
 
         # A standard map is 25 x 16 cells
-        self.map_database: list[list[Stone | Brick | Tank | EnemyTank | Bullet | Mirror | Water | Forest | int]] = [[0 for _ in range(self.screen_width // 16)] for _ in range(self.screen_height // 16)] # made this adaptable to screen size
+        self.map_database: list[list[Stone | Brick | Tank | EnemyTank | Bullet | Mirror | Water | Forest | int]] = [[0 for _ in range((self.screen_width // 16)-4)] for _ in range(self.screen_height // 16)] # made this adaptable to screen size
 
         # Scans the map file and updates parameters
         self.map = self.map_load["map"] # self.map_loader: list[list[Stone | Brick | Tank | EnemyTank | Bullet | Mirror | int]] = self.map_load["map"] # Using this directly as map_database causes list mutation after restarting a game. TOO BAD.
@@ -103,7 +110,7 @@ class Game:
         self.concurrent_enem_spawn: int = 0
         self.dedicated_enem_spawn: list[tuple[int, int]] = []
 
-        self.duplicate_map_database: list[list[Stone | Brick | Tank | EnemyTank | Bullet | Mirror | int]] = [[0 for _ in range(self.screen_width // 16)] for _ in range(self.screen_height // 16)]
+        self.duplicate_map_database: list[list[Stone | Brick | Tank | EnemyTank | Bullet | Mirror | int]] = [[0 for _ in range((self.screen_width // 16)-4)] for _ in range(self.screen_height // 16)]
         self.forest_draw: list[tuple[int, int]] = [] # Overwriting purposes
 
         # Helpful checks
@@ -514,7 +521,7 @@ class Game:
                     entity_move.x, entity_move.y, entity_move.direction = new_x, new_y, direction
 
     def is_in_bounds(self, new_x: int, new_y: int) -> bool:
-        return not (0 <= new_x < self.screen_width // 16) or not (0 <= new_y < self.screen_height // 16)
+        return not (0 <= new_x < (self.screen_width // 16)-4) or not (0 <= new_y < self.screen_height // 16)
 # ------- Helper Functions -------
 
 # ------- Main collision checker + Entity movement function -------
@@ -607,22 +614,29 @@ class Game:
                         self.visited_enemy_tanks_so_far.add(entity.label)
         self.visited_enemy_tanks_so_far.clear()
 
+    def powerup(self):
+        if self.rem_tanks == self.num_tanks//2 and self.time < self.powerup_time_limit and not self.powerup_got:
+            self.hp += 1
+            self.powerup_got = True
+            print('GOTCHA! POWERUP GET!')
+
     def cheat(self):
         if not self.cheat_input:
-            self.timer = pyxel.frame_count + 180
+            self.input_timer = pyxel.frame_count + 180
 
-        if self.cheat_input == ['UP','UP','DOWN','DOWN','LEFT','RIGHT','LEFT','RIGHT','B','A','ENTER'] and pyxel.frame_count < self.timer:
+        if self.cheat_input == ['UP','UP','DOWN','DOWN','LEFT','RIGHT','LEFT','RIGHT','B','A','ENTER'] and pyxel.frame_count < self.input_timer:
             self.hp += 1
-            self.timer = 0
+            self.input_timer = 0
             print('CHEATCODE ACTIVATED!, current lives:' + str(self.hp))
-        elif self.cheat_input == ['DEBUG','DEBUG','DEBUG','DEBUG','DEBUG',] and pyxel.frame_count < self.timer:
+        elif self.cheat_input == ['DEBUG','DEBUG','DEBUG','DEBUG','DEBUG',] and pyxel.frame_count < self.input_timer:
             self.internal_level = 1
+            self.hp = 99
             self.level_list.clear()
             self.level_list = ['debug_levels/' + f for f in os.listdir('assets/levels/debug_levels') if os.path.isfile('assets/levels/debug_levels/'+f) and f.endswith('.json')]
             self.map_loaded = False
             print('DEBUG ENABLED!')
             self.load()
-        elif pyxel.frame_count > self.timer:
+        elif pyxel.frame_count > self.input_timer:
             self.cheat_input.clear()
         else:
             if pyxel.btnp(pyxel.KEY_UP):
@@ -650,7 +664,7 @@ class Game:
         if pyxel.frame_count % 180 == 0 and self.concurrent_enem_spawn != self.num_tanks: #enemy tank spawns in an interval of 3 seconds, maybe this can be configured in the map file for increasing difficulty
             self.generate_enem_tank()
 
-        if self.player_tank.hp == 0 and pyxel.btnp(pyxel.KEY_R):
+        if self.player_tank.hp == 0 and pyxel.btnp(pyxel.KEY_R) and not self.is_gameover:
             self.player_tank = Tank(self.spawnpoint[0], self.spawnpoint[1], 'right', 1, 1, False, Bullet(0, 0, 'right', False, 'player'))
             self.map_database[self.spawnpoint[1]][self.spawnpoint[0]] = self.player_tank
             
@@ -659,16 +673,18 @@ class Game:
                 self.undraw = True
                 pyxel.stop() # stop music
 
-            if self.is_gameover and pyxel.btnp(pyxel.KEY_R):
+            if self.is_gameover and self.undraw and pyxel.btnp(pyxel.KEY_R):
                 self.internal_level = 1
+                self.hp = 2
                 self.map_loaded = False
                 self.load()
-            elif self.is_win and pyxel.btnp(pyxel.KEY_RETURN):
+            elif self.is_win and self.undraw and pyxel.btnp(pyxel.KEY_RETURN):
                 self.internal_level += 1
                 self.map_loaded = False
                 self.load()
 
         if not self.undraw:
+            self.time += 1
             if pyxel.btnp(pyxel.KEY_Q):
                 pyxel.quit()
 
@@ -702,7 +718,7 @@ class Game:
                 if pyxel.frame_count % 4 == 0:
                     self.movement('down', 'player', self.player_tank.x, self.player_tank.y, self.player_tank)
             
-            if pyxel.btnp(pyxel.KEY_SPACE) and not self.player_tank.is_shoot and pyxel.frame_count > self.frames_before_starting: #  # Uncomment this later. This prevents the player from shooting before the game starts
+            if pyxel.btnp(pyxel.KEY_SPACE) and not self.player_tank.is_shoot and pyxel.frame_count > self.frames_before_starting and self.player_tank.hp != 0: #  # Uncomment this later. This prevents the player from shooting before the game starts
                 # pyxel.play(0, 0)
                 self.player_tank.bullet.x, self.player_tank.bullet.y, self.player_tank.bullet.direction = self.player_tank.x, self.player_tank.y, self.player_tank.direction
                 self.player_tank.is_shoot = True
@@ -719,6 +735,59 @@ class Game:
             
             self.check_rem_tanks()
 
+            self.powerup()
+
+    #generate tutorial messages in sidebar
+    def draw_tutorial(self):
+        if self.tutorial == 0:
+            pyxel.blt(416, 204, 0, 0, 96, 16, 16, 0)
+            pyxel.blt(432, 204, 0, 32, 96, 16, 16, 0)
+            pyxel.text(402, 222, 'Destroy half of', 7)
+            pyxel.text(402, 230, 'the enemy tanks', 7)
+            pyxel.text(402, 238, 'quickly to gain', 7)
+            pyxel.text(404, 246, 'an extra life!', 7)
+
+        elif self.tutorial == 1:
+            pyxel.blt(424, 204, 0, 16, 16, 16, 16, 0)
+            pyxel.text(410, 222, 'TYPE: STONE', 7)
+            pyxel.text(414, 230, 'Tanks and', 7)
+            pyxel.text(404, 238, 'bullets cannot', 7)
+            pyxel.text(408, 246, 'pass through', 7)
+        
+        elif self.tutorial == 2:
+            pyxel.blt(416, 204, 0, 0, 48, 16, 16, 0)
+            pyxel.blt(432, 204, 0, 16, 48, 16, 16, 0)
+            pyxel.text(410, 222, 'TYPE: BRICK', 7)
+            pyxel.text(402, 230, 'Tanks cant pass', 7)
+            pyxel.text(402, 238, 'Hit with bullet', 7)
+            pyxel.text(406, 246, 'to destroy it', 7)
+
+        elif self.tutorial == 3:
+            pyxel.blt(416, 204, 0, 32, 16, 16, 16, 0)
+            pyxel.blt(432, 204, 0, 48, 16, 16, 16, 0)
+            pyxel.text(409, 222, 'TYPE: MIRROR', 7)
+            pyxel.text(402, 230, 'Tanks cant pass', 7)
+            pyxel.text(406, 238, 'Changes bullet', 7)
+            pyxel.text(414, 246, 'direction', 7)
+
+        elif self.tutorial == 4:
+            pyxel.blt(424, 204, 0, 32, 48, 16, 16, 0)
+            pyxel.text(410, 222, 'TYPE: WATER', 7)
+            pyxel.text(402, 230, 'Tanks cant pass', 7)
+            pyxel.text(410, 238, 'Bullets can', 7)
+            pyxel.text(409, 246, 'pass through', 7)
+        
+        elif self.tutorial == 5:
+            pyxel.blt(424, 204, 0, 48, 48, 16, 16, 0)
+            pyxel.text(410, 222, 'TYPE: FOREST', 7)
+            pyxel.text(410, 230, 'Covers Tanks', 7)
+
+        elif self.tutorial == 999:
+            pyxel.blt(424, 204, 0, 224, 48, 16, 16, 0)
+            pyxel.text(412, 222, 'DEBUG MODE', 7)
+            pyxel.text(409, 230, 'Restart game', 7)
+            pyxel.text(409, 238, 'to return to', 7)
+            pyxel.text(410, 246, 'normal maps', 7)
 
 
     def draw(self):
@@ -799,6 +868,63 @@ class Game:
                 pyxel.text((self.screen_width // 2), (self.screen_height // 2), '1', 7)
             else:
                 pyxel.text((self.screen_width // 2), (self.screen_height // 2), 'GO!', 7)
+
+        #Sidebar UI elements
+        pyxel.rect(400, 0, 64, self.screen_height, 0)
+        pyxel.text(410, 4, 'Battle City', 7)
+        pyxel.text(410, 12, f'Level: {self.level}', 7)
+        pyxel.text(410, 20, self.stage_name, 7) #level names must be restricted to 12 characters (including whitespace)
+        pyxel.text(410, 28, f'Time: {self.time}', 7)
+        pyxel.line(400, 38, 464, 38, 7)
+
+        #lives remaining
+        pyxel.blt(416, 46, 0, 0, 96, 16, 16, 0)
+        if self.hp < 10:
+            pyxel.blt(432, 46, 0, 240, self.hp*16, 16, 16, 0)
+        else:
+            pyxel.blt(429, 46, 0, 240, (self.hp//10)*16, 16, 16, 0)
+            pyxel.blt(436, 46, 0, 240, (self.hp - (self.hp//10)*10)*16, 16, 16, 0)
+
+        #tanks remaining
+        pyxel.blt(416, 62, 0, 0, 32, 16, 16, 0)
+        if self.rem_tanks < 10:
+            pyxel.blt(432, 62, 0, 240, self.rem_tanks*16, 16, 16, 0) # single digit tanks remaining
+        else:
+            pyxel.blt(429, 62, 0, 240, (self.rem_tanks//10)*16, 16, 16, 0)
+            pyxel.blt(436, 62, 0, 240, (self.rem_tanks - (self.rem_tanks//10)*10)*16, 16, 16, 0) # 2 digits
+
+        pyxel.line(400, 87, 464, 87, 7)
+
+        #how to play
+        pyxel.text(410, 96, 'HOW TO PLAY', 7)
+
+        pyxel.blt(424, 100, 0, 224, 16, 16, 16, 0)
+        pyxel.text(406, 116, 'Use the arrow', 7)
+        pyxel.text(408, 124, 'keys to move', 7)
+
+        pyxel.blt(424, 132, 0, 224, 32, 16, 16, 0)
+        pyxel.text(406, 148, 'Use space bar', 7)
+        pyxel.text(416, 156, 'to shoot', 7)
+
+        pyxel.blt(424, 164, 0, 0, 32, 16, 16, 0)
+        pyxel.text(410, 184, 'Destroy the', 7)
+        pyxel.text(410, 192, 'enemy tanks', 7)
+
+        self.draw_tutorial()
+
+        pyxel.line(400, 256, 464, 256, 7)
+
+        pyxel.text(402, 262, f'Powerup({self.powerup_time_limit})', 7)
+        if not self.powerup_got and (self.time < self.powerup_time_limit - 120):
+            pyxel.blt(454, 260, 0, 24, 96, 8, 8, 0)
+        elif not self.powerup_got and (self.time < self.powerup_time_limit):
+            if self.time % 5 == 0:
+                pyxel.blt(454, 260, 0, 24, 96, 8, 8, 0)
+        else:
+            pyxel.blt(454, 260, 0, 24, 104, 8, 8, 0)
+
+        if self.powerup_got:
+            pyxel.blt(454, 260, 0, 16, 96, 8, 8, 0)
 
         # The deeper the code here, the more it will be drawn on top of the other entities
                 

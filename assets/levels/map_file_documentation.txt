@@ -1,5 +1,5 @@
 A battle city map file is a json file.
-it should be named as "levelX.json, where X is the level number.
+it should be named as "levelXX.json, where XX is the level number.
 
 inside the json file are the following:
 
@@ -7,10 +7,17 @@ level: [int]
 - the level of the map
 
 stage_name: [str]
-- the name of the stage
+- the name of the stage. This should only be 12 characters long
 
 enemy_count: [int]
 - the number of enemies to spawn periodically in the map
+
+powerup_req: [int]
+the time (in frames) for the extra life powerup
+half of the number of enemy tanks specified in enemy_count must be destroyed before reaching this time, else no powerup given
+
+tutorial: [int]
+specifies what specific entity tutorial segment to show on the sidebar
 
 map: list[list[int]]
 - a list of lists where each inner list's items correspond to a specific cell of a map. This is used for generating the map when the game/next level starts
