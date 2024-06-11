@@ -61,7 +61,7 @@ class Game:
     def __init__(self):
         self.screen_width = 464
         self.screen_height = 272
-        self.internal_level = 11
+        self.internal_level = 1
         self.hp = 2
         self.map_loaded = False
         self.level_list = [f for f in os.listdir('assets/levels') if os.path.isfile('assets/levels/'+f) and f.endswith('.json')]
@@ -129,7 +129,6 @@ class Game:
         # pyxel.playm(0, loop=True) # :3 
         self.cheat_input: list[str] = []
         self.generate_level()
-        #self.generate_enem_tank()
 
     # Main priority in generation is to ensure that the tanks and stones do not overlap each other
     def generate_level(self):
@@ -211,23 +210,24 @@ class Game:
             x_i, y_i = self.dedicated_enem_spawn[pick]
 
             if self.check_if_pos_is_unique(x_i, y_i):
-                #print(x_i, y_i)
-                enem_tank = EnemyTank(x_i, y_i, 'up', 1, 1, False, Bullet(x_i, y_i, 'up', False, chr(self.random_label)), chr(self.random_label)) # we should generate randomize labels infinitely to prevent bug in infinitely many tanks generation
-                self.map_database[y_i][x_i] = enem_tank
-                self.random_label += 1
-                self.concurrent_enem_spawn += 1
-            else:
-                while not self.check_if_pos_is_unique(x_i, y_i):
-                    pick = randint(0,len(self.dedicated_enem_spawn)-1)
-                    x_i, y_i = self.dedicated_enem_spawn[pick]
-                    
-                    if self.check_if_pos_is_unique(x_i, y_i):
-                        enem_tank = EnemyTank(x_i, y_i, 'up', 1, 1, False, Bullet(x_i, y_i, 'up', False, chr(self.random_label)), chr(self.random_label)) # we should generate randomize labels infinitely to prevent bug in infinitely many tanks generation
-                        self.map_database[y_i][x_i] = enem_tank
-                        break
-
+                tank_choice = choice(['regular', 'regular', 'buff'])
+                if tank_choice == 'regular':
+                    regular_enem_tank = EnemyTank(x_i, y_i, 'up', 1, 1, False, Bullet(x_i, y_i, 'up', False, f'regular_{chr(self.random_label)}'), f'regular_{chr(self.random_label)}') # we should generate randomize labels infinitely to prevent bug in infinitely many tanks generation
+                    self.map_database[y_i][x_i] = regular_enem_tank
                     self.random_label += 1
                     self.concurrent_enem_spawn += 1
+
+                else:
+                    buff_enem_tank = EnemyTank(x_i, y_i, 'up', 1, 2, False, Bullet(x_i, y_i, 'up', False, f'buff_{chr(self.random_label)}'), f'buff_{chr(self.random_label)}')
+                    self.map_database[y_i][x_i] = buff_enem_tank
+                    self.random_label += 1
+                    self.concurrent_enem_spawn += 1
+                    
+            else:
+                self.generate_enem_tank() # Recursive call to generate another enemy tank instead of while loop again
+
+        else:
+            return
     # ------- End of Random Level Generator Mode (unused) -------
 
 # ------- Helper Functions -------
@@ -770,7 +770,7 @@ class Game:
                             pyxel.blt(entity.x*16, entity.y*16, 0, 0, 48, 16, 16, 0)
                         else:
                             pyxel.blt(entity.x*16, entity.y*16, 0, 16, 48, 16, 16, 0)
-                    elif type(entity) == EnemyTank:
+                    elif type(entity) == EnemyTank and entity.label[:7] == 'regular':
                         if entity.direction == 'up':
                             pyxel.blt(entity.x*16, entity.y*16, 0, 0, 32, 16, 16, 0)
                         elif entity.direction == 'down':
@@ -779,6 +779,15 @@ class Game:
                             pyxel.blt(entity.x*16, entity.y*16, 0, 32, 32, 16, 16, 0)
                         elif entity.direction == 'left':
                             pyxel.blt(entity.x*16, entity.y*16, 0, 48, 32, 16, 16, 0)
+                    elif type(entity) == EnemyTank and entity.label[:4] == 'buff':
+                        if entity.direction == 'up':
+                            pyxel.blt(entity.x*16, entity.y*16, 0, 0, 80, 16, 16, 0)
+                        elif entity.direction == 'down':
+                            pyxel.blt(entity.x*16, entity.y*16, 0, 16, 80, 16, 16, 0)
+                        elif entity.direction == 'right':
+                            pyxel.blt(entity.x*16, entity.y*16, 0, 32, 80, 16, 16, 0)
+                        elif entity.direction == 'left':
+                            pyxel.blt(entity.x*16, entity.y*16, 0, 48, 80, 16, 16, 0)
                     elif type(entity) == Bullet:
                         pyxel.blt(entity.x*16, entity.y*16, 0, 0, 16, 16, 16, 0)
                     elif type(entity) == Mirror:
