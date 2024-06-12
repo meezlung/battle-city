@@ -1,9 +1,9 @@
 {
-    "level":5,
-    "stage_name": "Bricks III",
+    "level":7,
+    "stage_name": "Blocked",
     "enemy_count": 10,
     "powerup_req": 1100,
-    "tutorial": 2,
+    "tutorial": -1,
     "map": [
         [2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2],
         [2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2],

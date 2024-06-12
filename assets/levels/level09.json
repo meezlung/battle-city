@@ -1,9 +1,9 @@
 {
     "level":9,
-    "stage_name": "Mirror II",
-    "enemy_count": 12,
-    "powerup_req": 1200,
-    "tutorial": 3,
+    "stage_name": "Mirror loop",
+    "enemy_count": 15,
+    "powerup_req": 1750,
+    "tutorial": -1,
     "map": [
         [4,6,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,7,4],
         [6,0,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,0,7],

@@ -126,7 +126,7 @@ class Game:
         self.is_shoot_bullet = False
         self.should_overwrite_bullet = False
 
-        # pyxel.playm(0, loop=True) # :3 
+        pyxel.playm(0, loop=True) # :3 
         self.cheat_input: list[str] = []
         self.generate_level()
 
@@ -243,7 +243,7 @@ class Game:
                         destroyposrow = self.map_database.index(row)
                         destroypos = self.map_database[destroyposrow].index(entity)
                         self.map_database[destroyposrow][destroypos] = 0
-                        # pyxel.play(1, 1)
+                        pyxel.play(3, 1)
 
                         if type(entity) == Tank and entity.hp == 0:
                             self.hp -= 1
@@ -263,7 +263,7 @@ class Game:
                             self.is_gameover = True
                             self.frames = pyxel.frame_count + 180
                         
-                        # pyxel.play(2, 2)
+                        pyxel.play(3, 2)
 
     def check_rem_tanks(self):
         if self.rem_tanks == 0 and not self.is_win:
@@ -329,7 +329,7 @@ class Game:
         elif entity == 'bullet':
             if not isinstance(entity_move, (Tank, EnemyTank, Mirror, Water)):
                 self.map_database[curr_y][curr_x] = 0
-                # pyxel.play(2, 2)
+                pyxel.play(3, 2)
             
             self.duplicate_map_database[curr_y][curr_x] = 0 # Handle collisions for bullet overwrites. No need extra checks since this duplicate map_database is only for bullets
 
@@ -341,7 +341,7 @@ class Game:
 
         if type(bullet1) == type(bullet2) and isinstance(bullet1, Bullet) and isinstance(bullet2, Bullet):
             print("Bullet collision happened", bullet1, bullet2)      
-            # pyxel.play(2, 2)
+            pyxel.play(3, 2)
             bullet1.is_shoot = False
             bullet2.is_shoot = False
 
@@ -558,7 +558,7 @@ class Game:
                             if pyxel.frame_count % random_time_interval_to_shoot == 0:
                                 should_shoot = choice([True, False])     
                                 if should_shoot and not entity.is_shoot:
-                                    # pyxel.play(0, 0)
+                                    pyxel.play(3, 0)
                                     entity.bullet.x, entity.bullet.y, entity.bullet.direction = entity.x, entity.y, entity.direction
                                     entity.is_shoot = True
                                     entity.bullet.is_shoot = True
@@ -578,7 +578,7 @@ class Game:
 
     def cheat(self):
         if not self.cheat_input:
-            self.input_timer = pyxel.frame_count + 180
+            self.input_timer = pyxel.frame_count + 300
 
         if self.cheat_input == ['UP','UP','DOWN','DOWN','LEFT','RIGHT','LEFT','RIGHT','B','A','ENTER'] and pyxel.frame_count < self.input_timer:
             self.hp += 1
@@ -619,6 +619,12 @@ class Game:
         self.cheat()
         if pyxel.frame_count % 180 == 0 and self.concurrent_enem_spawn != self.num_tanks: #enemy tank spawns in an interval of 3 seconds, maybe this can be configured in the map file for increasing difficulty
             self.generate_enem_tank()
+
+        if pyxel.btn(pyxel.KEY_CTRL) and pyxel.btn(pyxel.KEY_N): #restart game
+            self.internal_level = 1
+            self.hp = 2
+            self.map_loaded = False
+            self.load()
 
         if self.player_tank.hp == 0 and pyxel.btnp(pyxel.KEY_R) and not self.is_gameover:
             self.player_tank = Tank(self.spawnpoint[0], self.spawnpoint[1], 'right', 1, 1, False, Bullet(0, 0, 'right', False, 'player'))
@@ -675,7 +681,7 @@ class Game:
                     self.movement('down', 'player', self.player_tank.x, self.player_tank.y, self.player_tank)
             
             if pyxel.btnp(pyxel.KEY_SPACE) and not self.player_tank.is_shoot and pyxel.frame_count > self.frames_before_starting and self.player_tank.hp != 0: #  # Uncomment this later. This prevents the player from shooting before the game starts
-                # pyxel.play(0, 0)
+                pyxel.play(3, 0)
                 self.player_tank.bullet.x, self.player_tank.bullet.y, self.player_tank.bullet.direction = self.player_tank.x, self.player_tank.y, self.player_tank.direction
                 self.player_tank.is_shoot = True
                 self.player_tank.bullet.is_shoot = True
@@ -696,13 +702,20 @@ class Game:
 
     #generate tutorial messages in sidebar
     def draw_tutorial(self):
-        if self.tutorial == 0:
-            pyxel.blt(416, 204, 0, 0, 96, 16, 16, 0)
-            pyxel.blt(432, 204, 0, 32, 96, 16, 16, 0)
+        if self.tutorial == -1:
+            pyxel.blt(416, 204, 0, 0, 112, 16, 16, 0)
+            pyxel.blt(432, 204, 0, 32, 112, 16, 16, 0)
             pyxel.text(402, 222, 'Destroy half of', 7)
             pyxel.text(402, 230, 'the enemy tanks', 7)
             pyxel.text(402, 238, 'quickly to gain', 7)
             pyxel.text(404, 246, 'an extra life!', 7)
+
+        elif self.tutorial == 0:
+            pyxel.blt(424, 204, 0, 0, 64, 16, 16, 0)
+            pyxel.text(414, 222, 'Do not let', 7)
+            pyxel.text(403, 230, 'the enemy tanks', 7)
+            pyxel.text(412, 238, 'destroy the', 7)
+            pyxel.text(414, 246, 'home base!', 7)
 
         elif self.tutorial == 1:
             pyxel.blt(424, 204, 0, 16, 16, 16, 16, 0)
@@ -781,13 +794,13 @@ class Game:
                             pyxel.blt(entity.x*16, entity.y*16, 0, 48, 32, 16, 16, 0)
                     elif type(entity) == EnemyTank and entity.label[:4] == 'buff':
                         if entity.direction == 'up':
-                            pyxel.blt(entity.x*16, entity.y*16, 0, 0, 80, 16, 16, 0)
+                            pyxel.blt(entity.x*16, entity.y*16, 0, 0, 96-16*(entity.hp-1), 16, 16, 0)
                         elif entity.direction == 'down':
-                            pyxel.blt(entity.x*16, entity.y*16, 0, 16, 80, 16, 16, 0)
+                            pyxel.blt(entity.x*16, entity.y*16, 0, 16, 96-16*(entity.hp-1), 16, 16, 0)
                         elif entity.direction == 'right':
-                            pyxel.blt(entity.x*16, entity.y*16, 0, 32, 80, 16, 16, 0)
+                            pyxel.blt(entity.x*16, entity.y*16, 0, 32, 96-16*(entity.hp-1), 16, 16, 0)
                         elif entity.direction == 'left':
-                            pyxel.blt(entity.x*16, entity.y*16, 0, 48, 80, 16, 16, 0)
+                            pyxel.blt(entity.x*16, entity.y*16, 0, 48, 96-16*(entity.hp-1), 16, 16, 0)
                     elif type(entity) == Bullet:
                         pyxel.blt(entity.x*16, entity.y*16, 0, 0, 16, 16, 16, 0)
                     elif type(entity) == Mirror:
@@ -800,14 +813,35 @@ class Game:
                     elif type(entity) == HomeBase:
                         pyxel.blt(entity.x*16, entity.y*16, 0, 0, 64, 16, 16, 0)
                     
-                    for forest in self.forest_draw: # Overwriting background with the bushes
-                        pyxel.blt(forest[0]*16, forest[1]*16, 0, 48, 48, 16, 16, 0)
+            for forest in self.forest_draw: # Overwriting background with the bushes
+                pyxel.blt(forest[0]*16, forest[1]*16, 0, 48, 48, 16, 16, 0)
                         
         else:
             if self.is_gameover:
-                pyxel.text((self.screen_width // 2) - 20, (self.screen_height // 2) - 20, 'GAME OVER', 7) # Temporary values. might have to make a game over splash screen instead since the text is small
+                #pyxel.text((self.screen_width // 2) - 20, (self.screen_height // 2) - 20, 'GAME OVER', 7) # Temporary values. might have to make a game over splash screen instead since the text is small
+                pyxel.blt((self.screen_width // 2) - 104, (self.screen_height // 2) - 8, 0, 208, 48, 16, 16)
+                pyxel.blt((self.screen_width // 2) - 88, (self.screen_height // 2) - 8, 0, 176, 0, 16, 16)
+                pyxel.blt((self.screen_width // 2) - 72, (self.screen_height // 2) - 8, 0, 176, 16, 16, 16)
+                pyxel.blt((self.screen_width // 2) - 56, (self.screen_height // 2) - 8, 0, 176, 32, 16, 16)
+                pyxel.blt((self.screen_width // 2) - 40, (self.screen_height // 2) - 8, 0, 224, 64, 16, 16)
+                pyxel.blt((self.screen_width // 2) - 24, (self.screen_height // 2) - 8, 0, 208, 64, 16, 16)
+                pyxel.blt((self.screen_width // 2) - 8, (self.screen_height // 2) - 8, 0, 176, 48, 16, 16)
+                pyxel.blt((self.screen_width // 2) + 8, (self.screen_height // 2) - 8, 0, 176, 32, 16, 16)
+                pyxel.blt((self.screen_width // 2) + 24, (self.screen_height // 2) - 8, 0, 176, 64, 16, 16)
+                pyxel.rect((self.screen_width // 2) - 68, (self.screen_height // 2) + 18, 76, 10, 0)
+                pyxel.text((self.screen_width // 2) - 66, (self.screen_height // 2) + 20, 'Press R to Restart', 10)
             elif self.is_win:
-                pyxel.text((self.screen_width // 2) - 20, (self.screen_height // 2) - 20, 'YOU WIN!', 7)
+                #pyxel.text((self.screen_width // 2) - 20, (self.screen_height // 2) - 20, 'YOU WIN!', 7)
+                pyxel.blt((self.screen_width // 2) - 88, (self.screen_height // 2) - 8, 0, 192, 0, 16, 16)
+                pyxel.blt((self.screen_width // 2) - 72, (self.screen_height // 2) - 8, 0, 208, 64, 16, 16)
+                pyxel.blt((self.screen_width // 2) - 56, (self.screen_height // 2) - 8, 0, 192, 16, 16, 16)
+                pyxel.blt((self.screen_width // 2) - 40, (self.screen_height // 2) - 8, 0, 224, 64, 16, 16)
+                pyxel.blt((self.screen_width // 2) - 24, (self.screen_height // 2) - 8, 0, 192, 32, 16, 16)
+                pyxel.blt((self.screen_width // 2) - 8, (self.screen_height // 2) - 8, 0, 192, 48, 16, 16)
+                pyxel.blt((self.screen_width // 2) + 8, (self.screen_height // 2) - 8, 0, 192, 64, 16, 16)
+                pyxel.rect((self.screen_width // 2) - 82, (self.screen_height // 2) + 18, 98, 10, 0)
+                pyxel.text((self.screen_width // 2) - 78, (self.screen_height // 2) + 20, 'Press Enter to continue', 10)
+
 
         # Overwriting enemy tanks with their enemy tank bullets
         for row in self.duplicate_map_database:
@@ -819,13 +853,19 @@ class Game:
         if self.frames_before_starting - pyxel.frame_count >= 0:
             countdown = self.frames_before_starting - pyxel.frame_count
             if countdown >= 180:
-                pyxel.text((self.screen_width // 2), (self.screen_height // 2), '3', 7)
+                #pyxel.text((self.screen_width // 2) - 30, (self.screen_height // 2) - 1, '3', 0)
+                pyxel.blt((self.screen_width // 2) - 40, (self.screen_height // 2) - 8, 0, 208, 0, 16, 16)
             elif countdown >= 120:
-                pyxel.text((self.screen_width // 2), (self.screen_height // 2), '2', 7)
+                #pyxel.text((self.screen_width // 2) - 30, (self.screen_height // 2) - 1, '2', 0)
+                pyxel.blt((self.screen_width // 2) - 40, (self.screen_height // 2) - 8, 0, 208, 16, 16, 16)
             elif countdown >= 60:
-                pyxel.text((self.screen_width // 2), (self.screen_height // 2), '1', 7)
+                #pyxel.text((self.screen_width // 2) - 30, (self.screen_height // 2) - 1, '1', 0)
+                pyxel.blt((self.screen_width // 2) - 40, (self.screen_height // 2) - 8, 0, 208, 32, 16, 16)
             else:
-                pyxel.text((self.screen_width // 2), (self.screen_height // 2), 'GO!', 7)
+                #pyxel.text((self.screen_width // 2) - 30, (self.screen_height // 2) - 1, 'GO!', 0)
+                pyxel.blt((self.screen_width // 2) - 56, (self.screen_height // 2) - 8, 0, 208, 48, 16, 16)
+                pyxel.blt((self.screen_width // 2) - 40, (self.screen_height // 2) - 8, 0, 208, 64, 16, 16)
+                pyxel.blt((self.screen_width // 2) - 24, (self.screen_height // 2) - 8, 0, 208, 80, 16, 16)
 
         #Sidebar UI elements
         pyxel.rect(400, 0, 64, self.screen_height, 0)
@@ -836,7 +876,7 @@ class Game:
         pyxel.line(400, 38, 464, 38, 7)
 
         #lives remaining
-        pyxel.blt(416, 46, 0, 0, 96, 16, 16, 0)
+        pyxel.blt(416, 46, 0, 0, 112, 16, 16, 0)
         if self.hp < 10:
             pyxel.blt(432, 46, 0, 240, self.hp*16, 16, 16, 0)
         else:
@@ -864,25 +904,33 @@ class Game:
         pyxel.text(406, 148, 'Use space bar', 7)
         pyxel.text(416, 156, 'to shoot', 7)
 
-        pyxel.blt(424, 164, 0, 0, 32, 16, 16, 0)
+        pyxel.blt(416, 164, 0, 0, 32, 16, 16, 0)
+        pyxel.blt(432, 164, 0, 0, 80, 16, 16, 0)
         pyxel.text(410, 184, 'Destroy the', 7)
         pyxel.text(410, 192, 'enemy tanks', 7)
 
-        self.draw_tutorial()
+        if self.player_tank.hp == 0:
+            pyxel.blt(424, 204, 0, 48, 112, 16, 16, 0)
+            pyxel.text(416, 222, 'YOU DIED!', 7)
+            pyxel.text(403, 230, '', 7)
+            pyxel.text(414, 238, 'Press R to', 7)
+            pyxel.text(418, 246, 'Respawn!', 7)
+        else:
+            self.draw_tutorial()
 
         pyxel.line(400, 256, 464, 256, 7)
 
         pyxel.text(402, 262, f'Powerup({self.powerup_time_limit})', 7)
         if not self.powerup_got and (self.time < self.powerup_time_limit - 120):
-            pyxel.blt(454, 260, 0, 24, 96, 8, 8, 0)
+            pyxel.blt(454, 260, 0, 24, 112, 8, 8, 0)
         elif not self.powerup_got and (self.time < self.powerup_time_limit):
             if self.time % 5 == 0:
-                pyxel.blt(454, 260, 0, 24, 96, 8, 8, 0)
+                pyxel.blt(454, 260, 0, 24, 112, 8, 8, 0)
         else:
-            pyxel.blt(454, 260, 0, 24, 104, 8, 8, 0)
+            pyxel.blt(454, 260, 0, 24, 120, 8, 8, 0)
 
         if self.powerup_got:
-            pyxel.blt(454, 260, 0, 16, 96, 8, 8, 0)
+            pyxel.blt(454, 260, 0, 16, 112, 8, 8, 0)
 
         # The deeper the code here, the more it will be drawn on top of the other entities
                 
