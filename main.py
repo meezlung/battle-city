@@ -57,6 +57,10 @@ class Forest:
 class HomeBase(Brick):
     pass
 
+@dataclass # TODO: add debug stuff here. This is for checking what kind of debug message will be shown in the console. Each set of debug messages can be toggled using the number keys when debug mode is on
+class DebugValues:
+    pass
+
 class Game:
     def __init__(self):
         self.screen_width = 464
@@ -64,6 +68,8 @@ class Game:
         self.internal_level = 1
         self.hp = 2
         self.map_loaded = False
+        self.isdebug = False
+        self.debug_msg = DebugValues 
         self.level_list = [f for f in os.listdir('assets/levels') if os.path.isfile('assets/levels/'+f) and f.endswith('.json')]
         pyxel.init(self.screen_width, self.screen_height, fps=60)
         pyxel.load('assets/assets.pyxres')
@@ -126,8 +132,9 @@ class Game:
         self.is_shoot_bullet = False
         self.should_overwrite_bullet = False
 
-        pyxel.playm(0, loop=True) # :3 
+        #pyxel.playm(0, loop=True) # :3 
         self.cheat_input: list[str] = []
+        self.debug_input = 0
         self.generate_level()
 
     # Main priority in generation is to ensure that the tanks and stones do not overlap each other
@@ -275,7 +282,7 @@ class Game:
             for tank in row:
                 if type(tank) == Tank:
                     if bullet.label == 'player':
-                        # print('Player still alive')
+                        #print('Player still alive')
                         return False
                 elif type(tank) == EnemyTank:
                     if bullet.label == tank.label:
@@ -574,6 +581,7 @@ class Game:
         if self.rem_tanks == self.num_tanks//2 and self.time < self.powerup_time_limit and not self.powerup_got:
             self.hp += 1
             self.powerup_got = True
+            pyxel.play(1, 3)
             print('GOTCHA! POWERUP GET!')
 
     def cheat(self):
@@ -583,17 +591,20 @@ class Game:
         if self.cheat_input == ['UP','UP','DOWN','DOWN','LEFT','RIGHT','LEFT','RIGHT','B','A','ENTER'] and pyxel.frame_count < self.input_timer:
             self.hp += 1
             self.input_timer = 0
+            pyxel.play(1, 3)
             print('CHEATCODE ACTIVATED!, current lives:' + str(self.hp))
-        elif self.cheat_input == ['DEBUG','DEBUG','DEBUG','DEBUG','DEBUG',] and pyxel.frame_count < self.input_timer:
+        elif self.debug_input == 5 and pyxel.frame_count < self.input_timer:
             self.internal_level = 1
             self.hp = 99
             self.level_list.clear()
             self.level_list = ['debug_levels/' + f for f in os.listdir('assets/levels/debug_levels') if os.path.isfile('assets/levels/debug_levels/'+f) and f.endswith('.json')]
             self.map_loaded = False
+            self.isdebug = True
             print('DEBUG ENABLED!')
             self.load()
         elif pyxel.frame_count > self.input_timer:
             self.cheat_input.clear()
+            self.debug_input = 0
         else:
             if pyxel.btnp(pyxel.KEY_UP):
                 self.cheat_input.append('UP')
@@ -610,7 +621,7 @@ class Game:
             elif pyxel.btnp(pyxel.KEY_RETURN):
                 self.cheat_input.append('ENTER')
             elif pyxel.btnp(pyxel.KEY_DELETE):
-                self.cheat_input.append('DEBUG')
+                self.debug_input += 1
 
     def update(self):
         if not self.map_loaded:
@@ -650,23 +661,23 @@ class Game:
             if pyxel.btnp(pyxel.KEY_Q):
                 pyxel.quit()
 
-            if pyxel.btnp(pyxel.KEY_F1): # debug key, instant tank death
+            if self.isdebug and pyxel.btnp(pyxel.KEY_F1): # debug key, instant tank death
                 print(self.map_database[self.player_tank.y][self.player_tank.x])
                 tanko = self.map_database[self.player_tank.y][self.player_tank.x]
                 print('BOOM', tanko)
                 if isinstance(tanko, Tank):
                     tanko.hp = 0
             
-            if pyxel.btnp(pyxel.KEY_T): # debug key, checks map state mid-game
+            if self.isdebug and pyxel.btnp(pyxel.KEY_T): # debug key, checks map state mid-game
                 print(self.map_database)
 
             if pyxel.btn(pyxel.KEY_LEFT):
-                # print('left pressed!', self.player_tank)
+                print('left pressed!', self.player_tank) if self.isdebug else None
                 if pyxel.frame_count % 4 == 0:
                     self.movement('left', 'player', self.player_tank.x, self.player_tank.y, self.player_tank)
 
             elif pyxel.btn(pyxel.KEY_RIGHT):
-                # print('right pressed!', self.player_tank)
+                print('right pressed!', self.player_tank) if self.isdebug else None
                 if pyxel.frame_count % 4 == 0:
                     self.movement('right', 'player', self.player_tank.x, self.player_tank.y, self.player_tank)
 
@@ -710,21 +721,21 @@ class Game:
             pyxel.text(402, 238, 'quickly to gain', 7)
             pyxel.text(404, 246, 'an extra life!', 7)
 
-        elif self.tutorial == 0:
+        elif self.tutorial == 1:
             pyxel.blt(424, 204, 0, 0, 64, 16, 16, 0)
             pyxel.text(414, 222, 'Do not let', 7)
             pyxel.text(403, 230, 'the enemy tanks', 7)
             pyxel.text(412, 238, 'destroy the', 7)
             pyxel.text(414, 246, 'home base!', 7)
 
-        elif self.tutorial == 1:
+        elif self.tutorial == 2:
             pyxel.blt(424, 204, 0, 16, 16, 16, 16, 0)
             pyxel.text(410, 222, 'TYPE: STONE', 7)
             pyxel.text(414, 230, 'Tanks and', 7)
             pyxel.text(404, 238, 'bullets cannot', 7)
             pyxel.text(408, 246, 'pass through', 7)
         
-        elif self.tutorial == 2:
+        elif self.tutorial == 3:
             pyxel.blt(416, 204, 0, 0, 48, 16, 16, 0)
             pyxel.blt(432, 204, 0, 16, 48, 16, 16, 0)
             pyxel.text(410, 222, 'TYPE: BRICK', 7)
@@ -732,7 +743,7 @@ class Game:
             pyxel.text(402, 238, 'Hit with bullet', 7)
             pyxel.text(406, 246, 'to destroy it', 7)
 
-        elif self.tutorial == 3:
+        elif self.tutorial == 4:
             pyxel.blt(416, 204, 0, 32, 16, 16, 16, 0)
             pyxel.blt(432, 204, 0, 48, 16, 16, 16, 0)
             pyxel.text(409, 222, 'TYPE: MIRROR', 7)
@@ -740,14 +751,14 @@ class Game:
             pyxel.text(406, 238, 'Changes bullet', 7)
             pyxel.text(414, 246, 'direction', 7)
 
-        elif self.tutorial == 4:
+        elif self.tutorial == 5:
             pyxel.blt(424, 204, 0, 32, 48, 16, 16, 0)
             pyxel.text(410, 222, 'TYPE: WATER', 7)
             pyxel.text(402, 230, 'Tanks cant pass', 7)
             pyxel.text(410, 238, 'Bullets can', 7)
             pyxel.text(409, 246, 'pass through', 7)
         
-        elif self.tutorial == 5:
+        elif self.tutorial == 6:
             pyxel.blt(424, 204, 0, 48, 48, 16, 16, 0)
             pyxel.text(410, 222, 'TYPE: FOREST', 7)
             pyxel.text(410, 230, 'Covers Tanks', 7)
