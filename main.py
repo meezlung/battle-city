@@ -454,7 +454,7 @@ class Game:
         
         # Bullets fired from dead tanks
         if isinstance(is_from, Bullet):
-            if isinstance(entity_move, EnemyTank) and isinstance(is_from, EnemyTank): # Friendly fire enemy tanks case, should have bullet overwrite
+            if isinstance(entity_move, EnemyTank) and is_from.label != 'player': # Friendly fire enemy tanks case, should have bullet overwrite
                 self.duplicate_map_database[new_y][new_x] = Bullet(new_x, new_y, direction, True, is_from.label)
             elif isinstance(entity_move, Water): # Water case, should have bullet overwrite
                 self.duplicate_map_database[new_y][new_x] = Bullet(new_x, new_y, direction, True, is_from.label)
@@ -628,7 +628,7 @@ class Game:
             self.load()
 
         self.cheat()
-        if pyxel.frame_count % 180 == 0 and self.concurrent_enem_spawn != self.num_tanks: #enemy tank spawns in an interval of 3 seconds, maybe this can be configured in the map file for increasing difficulty
+        if pyxel.frame_count % 180 == 0 and self.concurrent_enem_spawn < self.num_tanks: #enemy tank spawns in an interval of 3 seconds, maybe this can be configured in the map file for increasing difficulty
             self.generate_enem_tank()
 
         if pyxel.btn(pyxel.KEY_CTRL) and pyxel.btn(pyxel.KEY_N): #restart game
@@ -639,8 +639,16 @@ class Game:
 
         if self.player_tank.hp == 0 and pyxel.btnp(pyxel.KEY_R) and not self.is_gameover:
             self.player_tank = Tank(self.spawnpoint[0], self.spawnpoint[1], 'right', 1, 1, False, Bullet(0, 0, 'right', False, 'player'))
-            self.map_database[self.spawnpoint[1]][self.spawnpoint[0]] = self.player_tank
             
+            if type(self.map_database[self.spawnpoint[1]][self.spawnpoint[0]]) == EnemyTank: # Cases wherein the spawnpoint has an enemy tank
+                self.rem_tanks -= 1
+                self.map_database[self.spawnpoint[1]][self.spawnpoint[0]] = self.player_tank
+            elif type(self.map_database[self.spawnpoint[1]][self.spawnpoint[0]]) == Bullet: # Cases wherein the spawnpoint has a bullet
+                self.player_tank.hp -= 1
+                self.map_database[self.spawnpoint[1]][self.spawnpoint[0]] = self.player_tank
+            else:
+                self.map_database[self.spawnpoint[1]][self.spawnpoint[0]] = self.player_tank
+
         if self.is_gameover or self.is_win:
             if pyxel.frame_count > self.frames:
                 self.undraw = True
