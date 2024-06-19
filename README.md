@@ -13,7 +13,7 @@ This game implements all the specifications from **Phase 1** up to **Phase 3**.
 <kbd>R</kbd>: Respawn tank / Restart game  
 <kbd>Enter</kbd>: Next stage  
 <kbd>Ctrl+N</kbd>: Restart game  
-<kbd>Delete</kbd>: Debug mode
+<kbd>Delete</kbd> (5 times): Debug mode
 
 
 ## How to play
@@ -166,7 +166,7 @@ Close and reopen the game in order to return to the normal maps.
 - Documentation
 
 ### Gabriel Mislang
-- Final implemntations for Enemy Tank + Variants, Mirror, Home Base
+- Final implementations for Enemy Tank + Variants, Mirror, Home Base
 - Final implementations for Map_Database System
 - Tank movement and collision detection system
 - Enemy Tank AI
