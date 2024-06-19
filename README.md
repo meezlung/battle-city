@@ -153,11 +153,27 @@ Close and reopen the game in order to return to the normal maps.
 <kbd>EQUALS</kbd>: Go to the next level  
 <kbd>INSERT</kbd>: Use debug mode on regular levels
 
-todo: add more debug tools
-
 ## Contributions
 
-todo
+### Mansur Batistil
+- Game Assets / UI
+- First implementation for Map_Database System
+- Stage File / loading system
+- First implementations for Stone, Brick, Mirror, Water, Forest 
+- Sound Effects
+- Powerup
+- Cheat & Debug Mode
+- Documentation
+
+### Gabriel Mislang
+- Final implemntations for Enemy Tank + Variants, Mirror, Home Base
+- Final implementations for Map_Database System
+- Tank movement and collision detection system
+- Enemy Tank AI
+- Player Movement
+- Bullet collision system + edge cases
+- Debugging program logic
+
 
 ## Demo Video
 
