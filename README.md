@@ -10,8 +10,8 @@ This game implements all the specifications from **Phase 1** up to **Phase 3**.
 
 <kbd>Arrow Keys</kbd>: Move tank  
 <kbd>Space</kbd>: Shoot bullets  
-<kbd>R</kbd>: Respawn tank / Restart game (if game over)  
-<kbd>Enter</kbd>: Next stage (if level completed)  
+<kbd>R</kbd>: Respawn tank / Restart game  
+<kbd>Enter</kbd>: Next stage  
 <kbd>Ctrl+N</kbd>: Restart game  
 <kbd>Delete</kbd>: Debug mode
 
@@ -131,6 +131,8 @@ Because of this, the cheat code input was implemented in such a way that it only
 
 If you messed up attempting to do the cheat code, _please wait 5 seconds and try again._
 
+As a result, it can be also be activated by pressing <kbd>KEYPAD ENTER</kbd> 5 times.
+
 
 ## Debugging
 
@@ -146,7 +148,10 @@ Close and reopen the game in order to return to the normal maps.
 ### Debug Mode Controls
 
 <kbd>T</kbd>: Prints the current state of `map_database` into the console  
-<kbd>F1</kbd>: Instantly kill the player
+<kbd>F1</kbd>: Instantly kill the player  
+<kbd>MINUS</kbd>: Go to the previous level  
+<kbd>EQUALS</kbd>: Go to the next level  
+<kbd>INSERT</kbd>: Use debug mode on regular levels
 
 todo: add more debug tools
 
