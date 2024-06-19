@@ -56,10 +56,6 @@ class Forest:
 class HomeBase(Brick):
     pass
 
-@dataclass # TODO: add debug stuff here. This is for checking what kind of debug message will be shown in the console. Each set of debug messages can be toggled using the number keys when debug mode is on
-class DebugValues:
-    pass
-
 class Game:
     def __init__(self):
         self.screen_width = 464
@@ -68,7 +64,6 @@ class Game:
         self.hp = 2
         self.map_loaded = False
         self.isdebug = False
-        self.debug_msg = DebugValues 
         self.level_list = [f for f in os.listdir('assets/levels') if os.path.isfile('assets/levels/'+f) and f.endswith('.json')]
         pyxel.init(self.screen_width, self.screen_height, fps=60)
         pyxel.load('assets/assets.pyxres')
@@ -91,9 +86,11 @@ class Game:
             self.internal_level += 1
 
     def init_gamestate(self):
+        #initialize main game variables
+        self.isfinallevel = False
         self.level = self.map_load["level"]
         self.stage_name = self.map_load["stage_name"]
-        self.tutorial = self.map_load["tutorial"]
+        self.tutorial = self.map_load["tutorial"] if not self.isdebug else 999
         self.powerup_time_limit = self.map_load["powerup_req"]
         self.is_gameover = False
         self.is_win = False
@@ -103,7 +100,7 @@ class Game:
         self.time = 0
         self.frames_before_starting = pyxel.frame_count + 200
 
-        # A standard map is 25 x 16 cells
+        # A standard map is 25 x 17 cells
         self.map_database: list[list[Stone | Brick | Tank | EnemyTank | Bullet | Mirror | Water | Forest | int]] = [[0 for _ in range((self.screen_width // 16)-4)] for _ in range(self.screen_height // 16)] # made this adaptable to screen size
 
         # Scans the map file and updates parameters
@@ -134,6 +131,11 @@ class Game:
         #pyxel.playm(0, loop=True) # :3 
         self.cheat_input: list[str] = []
         self.debug_input = 0
+        self.alt_cheat_input = 0
+
+        if self.internal_level == len(self.level_list): #check if the current level is the final level
+            self.isfinallevel = True
+
         self.generate_level()
 
     # Main priority in generation is to ensure that the tanks and stones do not overlap each other
@@ -229,7 +231,8 @@ class Game:
                     self.concurrent_enem_spawn += 1
                     
             else:
-                self.generate_enem_tank() # Recursive call to generate another enemy tank instead of while loop again
+                if not self.no_valid_spawn_points():
+                    self.generate_enem_tank() # Recursive call to generate another enemy tank instead of while loop again
 
         else:
             return
@@ -239,7 +242,7 @@ class Game:
     def check_if_pos_is_unique(self, x: int, y: int) -> bool:
         return self.map_database[y][x] == 0
 
-    # Check tank hp, remove tank if hp == 0
+    # Check entities with hp values, remove them if hp == 0
     def eliminate_no_hp_entity(self):
         for row in self.map_database:
             for entity in row:
@@ -505,6 +508,14 @@ class Game:
 
     def is_in_bounds(self, new_x: int, new_y: int) -> bool:
         return not (0 <= new_x < (self.screen_width // 16)-4) or not (0 <= new_y < self.screen_height // 16)
+    
+    def no_valid_spawn_points(self) -> bool: #if there are no valid spawn points, return true.
+        for ent in self.dedicated_enem_spawn:
+            if self.map_database[ent[1]][ent[0]] == 0:
+                return False
+        print('hey! there\'s no way to spawn anything!')
+        return True #this is to prevent a recursion error when the program tries to find a spot to spawn a new enemy tank
+            
 # ------- Helper Functions -------
 
 # ------- Main collision checker + Entity movement function -------
@@ -609,15 +620,15 @@ class Game:
             self.hp += 1
             self.powerup_got = True
             pyxel.play(1, 3)
-            print('GOTCHA! POWERUP GET!')
 
     def cheat(self):
         if not self.cheat_input:
             self.input_timer = pyxel.frame_count + 300
 
-        if self.cheat_input == ['UP','UP','DOWN','DOWN','LEFT','RIGHT','LEFT','RIGHT','B','A','ENTER'] and pyxel.frame_count < self.input_timer:
+        if (self.cheat_input == ['UP','UP','DOWN','DOWN','LEFT','RIGHT','LEFT','RIGHT','B','A','ENTER'] and pyxel.frame_count < self.input_timer) or self.alt_cheat_input == 5:
             self.hp += 1
             self.input_timer = 0
+            self.alt_cheat_input = 0
             pyxel.play(1, 3)
             print('CHEATCODE ACTIVATED!, current lives:' + str(self.hp))
         elif self.debug_input == 5 and pyxel.frame_count < self.input_timer:
@@ -629,7 +640,7 @@ class Game:
             self.isdebug = True
             print('DEBUG ENABLED!')
             self.load()
-        elif pyxel.frame_count > self.input_timer:
+        elif (pyxel.frame_count > self.input_timer) or pyxel.btnp(pyxel.KEY_BACKSPACE):
             self.cheat_input.clear()
             self.debug_input = 0
         else:
@@ -649,21 +660,38 @@ class Game:
                 self.cheat_input.append('ENTER')
             elif pyxel.btnp(pyxel.KEY_DELETE):
                 self.debug_input += 1
+            elif pyxel.btnp(pyxel.KEY_KP_ENTER):
+                self.alt_cheat_input += 1
 
-    def update(self):
-        if not self.map_loaded:
-            self.load()
+    def player_input_main(self):
+        # --------- Main Player Movement ---------
+        if pyxel.btn(pyxel.KEY_LEFT):
+            if pyxel.frame_count % 4 == 0:
+                self.movement('left', 'player', self.player_tank.x, self.player_tank.y, self.player_tank)
 
-        self.cheat()
-        if pyxel.frame_count % 30 == 0 and self.concurrent_enem_spawn < self.num_tanks: # Enemy tank spawns in an interval of 3 seconds, maybe this can be configured in the map file for increasing difficulty
-            self.generate_enem_tank()
+        elif pyxel.btn(pyxel.KEY_RIGHT):
+            if pyxel.frame_count % 4 == 0:
+                self.movement('right', 'player', self.player_tank.x, self.player_tank.y, self.player_tank)
 
-        if pyxel.btn(pyxel.KEY_CTRL) and pyxel.btn(pyxel.KEY_N): #restart game
-            self.internal_level = 1
-            self.hp = 2
-            self.map_loaded = False
-            self.load()
+        elif pyxel.btn(pyxel.KEY_UP):
+            if pyxel.frame_count % 4 == 0:
+                self.movement('up', 'player', self.player_tank.x, self.player_tank.y, self.player_tank)
 
+        elif pyxel.btn(pyxel.KEY_DOWN):
+            if pyxel.frame_count % 4 == 0:
+                self.movement('down', 'player', self.player_tank.x, self.player_tank.y, self.player_tank)
+
+        # --------- Shooting Bullets ---------
+        if pyxel.btnp(pyxel.KEY_SPACE) and not self.player_tank.is_shoot and pyxel.frame_count > self.frames_before_starting and self.player_tank.hp != 0: #  # Uncomment this later. This prevents the player from shooting before the game starts
+            pyxel.play(3, 0)
+            self.player_tank.bullet.x, self.player_tank.bullet.y, self.player_tank.bullet.direction = self.player_tank.x, self.player_tank.y, self.player_tank.direction
+            self.player_tank.is_shoot = True
+            self.player_tank.bullet.is_shoot = True
+
+        if self.player_tank.is_shoot and self.player_tank.bullet.is_shoot:
+            self.movement(self.player_tank.bullet.direction, 'bullet', self.player_tank.bullet.x, self.player_tank.bullet.y, self.player_tank)
+
+        # --------- Respawn Player Tank ---------
         if self.player_tank.hp == 0 and pyxel.btnp(pyxel.KEY_R) and not self.is_gameover:
             # Work around: If previous player bullet still exists in the game, the new self.player_tank should acquire this bullet
             # Otherwise, we should just create a new bullet for the new_tank
@@ -696,6 +724,16 @@ class Game:
                 self.map_database[self.spawnpoint[1]][self.spawnpoint[0]] = self.player_tank
                 self.duplicate_map_database[self.spawnpoint[1]][self.spawnpoint[0]] = 0
 
+    def player_input_sub(self):
+        if pyxel.btnp(pyxel.KEY_Q):
+                pyxel.quit()
+
+        if pyxel.btn(pyxel.KEY_CTRL) and pyxel.btn(pyxel.KEY_N): #restart game
+                    self.internal_level = 1
+                    self.hp = 2
+                    self.map_loaded = False
+                    self.load()
+
         if self.is_gameover or self.is_win:
             if pyxel.frame_count > self.frames:
                 self.undraw = True
@@ -706,55 +744,62 @@ class Game:
                 self.hp = 2
                 self.map_loaded = False
                 self.load()
-            elif self.is_win and self.undraw and pyxel.btnp(pyxel.KEY_RETURN):
+            elif self.is_win and self.undraw and pyxel.btnp(pyxel.KEY_RETURN) and not self.isfinallevel:
                 self.internal_level += 1
                 self.map_loaded = False
                 self.load()
 
-        if not self.undraw:
-            self.time += 1
-            if pyxel.btnp(pyxel.KEY_Q):
-                pyxel.quit()
+    def player_input_debug(self):
+        if self.isdebug and pyxel.btnp(pyxel.KEY_INSERT): # allow for debugging using the normal levels
+            self.level_list.clear()
+            self.level_list = [f for f in os.listdir('assets/levels') if os.path.isfile('assets/levels/'+f) and f.endswith('.json')]
+            self.map_loaded = False
+            self.load()
 
-            if self.isdebug and pyxel.btnp(pyxel.KEY_F1): # debug key, instant tank death
+        if self.isdebug and pyxel.btnp(pyxel.KEY_F1): # debug key, instant tank death
                 print(self.map_database[self.player_tank.y][self.player_tank.x])
                 tanko = self.map_database[self.player_tank.y][self.player_tank.x]
                 print('BOOM', tanko)
                 if isinstance(tanko, Tank):
                     tanko.hp = 0
             
-            if self.isdebug and pyxel.btnp(pyxel.KEY_T): # debug key, checks map state mid-game
-                print(self.map_database)
+        if self.isdebug and pyxel.btnp(pyxel.KEY_T): # debug key, checks map state mid-game
+            print(self.map_database)
 
-            if pyxel.btn(pyxel.KEY_LEFT):
-                # print('left pressed!', self.player_tank) if self.isdebug else None
-                if pyxel.frame_count % 4 == 0:
-                    self.movement('left', 'player', self.player_tank.x, self.player_tank.y, self.player_tank)
+        if self.isdebug and pyxel.btnp(pyxel.KEY_MINUS): # move to the previous level
+            print('minus')
+            if (self.internal_level - 1) > 0:
+                self.internal_level -= 1
+                self.map_loaded = False
+                self.load()
+            else:
+                print('ERROR! Already reached the lowest level')
 
-            elif pyxel.btn(pyxel.KEY_RIGHT):
-                # print('right pressed!', self.player_tank) if self.isdebug else None
-                if pyxel.frame_count % 4 == 0:
-                    self.movement('right', 'player', self.player_tank.x, self.player_tank.y, self.player_tank)
+        if self.isdebug and pyxel.btnp(pyxel.KEY_EQUALS): # move to the next level
+            print('plus')
+            if (self.internal_level - 1) < len(self.level_list)-1:
+                self.internal_level += 1
+                self.map_loaded = False
+                self.load()
+            else:
+                print('ERROR! Already reached the highest level')
 
-            elif pyxel.btn(pyxel.KEY_UP):
-                # print('up pressed!', self.player_tank)
-                if pyxel.frame_count % 4 == 0:
-                    self.movement('up', 'player', self.player_tank.x, self.player_tank.y, self.player_tank)
+    def update(self):
+        if not self.map_loaded:
+            self.load()
 
-            elif pyxel.btn(pyxel.KEY_DOWN):
-                # print('down pressed!', self.player_tank)
-                if pyxel.frame_count % 4 == 0:
-                    self.movement('down', 'player', self.player_tank.x, self.player_tank.y, self.player_tank)
-            
-            if pyxel.btnp(pyxel.KEY_SPACE) and not self.player_tank.is_shoot and pyxel.frame_count > self.frames_before_starting and self.player_tank.hp != 0:
-                pyxel.play(3, 0)
-                self.player_tank.bullet.x, self.player_tank.bullet.y, self.player_tank.bullet.direction = self.player_tank.x, self.player_tank.y, self.player_tank.direction
-                self.player_tank.is_shoot = True
-                self.player_tank.bullet.is_shoot = True
+        if pyxel.frame_count % 180 == 0 and self.concurrent_enem_spawn < self.num_tanks: #enemy tank spawns in an interval of 3 seconds, maybe this can be configured in the map file for increasing difficulty
+            self.generate_enem_tank()
 
-            if self.player_tank.is_shoot and self.player_tank.bullet.is_shoot:
-                self.movement(self.player_tank.bullet.direction, 'bullet', self.player_tank.bullet.x, self.player_tank.bullet.y, self.player_tank)
-            
+        self.cheat()
+        self.player_input_sub()
+
+        if not self.undraw:
+            self.time += 1
+
+            self.player_input_main()
+            self.player_input_debug()
+
             self.ai_tanks_moves()
 
             self.keep_bullet_shooting(self.map_database, self.visited_bullets_so_far)
@@ -911,8 +956,13 @@ class Game:
                 pyxel.blt((self.screen_width // 2) - 24, (self.screen_height // 2) - 8, 0, 192, 32, 16, 16)
                 pyxel.blt((self.screen_width // 2) - 8, (self.screen_height // 2) - 8, 0, 192, 48, 16, 16)
                 pyxel.blt((self.screen_width // 2) + 8, (self.screen_height // 2) - 8, 0, 192, 64, 16, 16)
-                pyxel.rect((self.screen_width // 2) - 82, (self.screen_height // 2) + 18, 98, 10, 0)
-                pyxel.text((self.screen_width // 2) - 78, (self.screen_height // 2) + 20, 'Press Enter to continue', 10)
+                if not self.isfinallevel:
+                    pyxel.rect((self.screen_width // 2) - 82, (self.screen_height // 2) + 18, 98, 10, 0)
+                    pyxel.text((self.screen_width // 2) - 78, (self.screen_height // 2) + 20, 'Press Enter to continue', 10)
+                else:
+                    pyxel.rect((self.screen_width // 2) - 114, (self.screen_height // 2) + 18, 162, 15, 0)
+                    pyxel.text((self.screen_width // 2) - 112, (self.screen_height // 2) + 20, 'CONGRATULATIONS! YOU COMPLETED THE GAME!', 10)
+                    pyxel.text((self.screen_width // 2) - 88, (self.screen_height // 2) + 26, 'PRESS CTRL + N TO PLAY AGAIN!', 10)
 
 
         # Countdown timer before starting the game
