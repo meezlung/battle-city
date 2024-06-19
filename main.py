@@ -726,13 +726,13 @@ class Game:
 
     def player_input_sub(self):
         if pyxel.btnp(pyxel.KEY_Q):
-                pyxel.quit()
+            pyxel.quit()
 
-        if pyxel.btn(pyxel.KEY_CTRL) and pyxel.btn(pyxel.KEY_N): #restart game
-                    self.internal_level = 1
-                    self.hp = 2
-                    self.map_loaded = False
-                    self.load()
+        if pyxel.btn(pyxel.KEY_CTRL) and pyxel.btn(pyxel.KEY_N): # Restart game
+            self.internal_level = 1
+            self.hp = 2
+            self.map_loaded = False
+            self.load()
 
         if self.is_gameover or self.is_win:
             if pyxel.frame_count > self.frames:
@@ -744,6 +744,7 @@ class Game:
                 self.hp = 2
                 self.map_loaded = False
                 self.load()
+                
             elif self.is_win and self.undraw and pyxel.btnp(pyxel.KEY_RETURN) and not self.isfinallevel:
                 self.internal_level += 1
                 self.map_loaded = False
