@@ -1,6 +1,6 @@
 {
     "level":10,
-    "stage_name": "Final Level",
+    "stage_name": "Forest Battle",
     "enemy_count": 25,
     "powerup_req": 2300,
     "tutorial": 0,

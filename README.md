@@ -1,9 +1,11 @@
 # battle-city
 ![Game Demo Image](docs/image/Demo1.png)  
-A tank battle game based on _Battle City_ (Namco, 1985) using [Pyxel](https://github.com/kitao/pyxel).
+A tank battle game based on _"Battle City"_ (Namco, 1985) using [Pyxel](https://github.com/kitao/pyxel).
 
 Made by Mansur Batistil and Gabriel Mislang for CS12 MP1.
-This game implements all the specifications from **Phase 1** up to **Phase 3**.
+This game implements all the specifications from **Phase 1** up to **Phase 3**, with some extra features added.
+
+The game background music is an arrangement of _"American Patrol"_ (Frank White (F.W.) Meacham, 1885). More specifically, it is based on the [stage 1 music](https://www.youtube.com/watch?v=NFHvcxBCeb4) used in the NES port of the game _"Circus Charlie"_ (Konami, 1986)
 
 
 ## Controls
@@ -12,7 +14,8 @@ This game implements all the specifications from **Phase 1** up to **Phase 3**.
 <kbd>Space</kbd>: Shoot bullets  
 <kbd>R</kbd>: Respawn tank / Restart game  
 <kbd>Enter</kbd>: Next stage  
-<kbd>Ctrl+N</kbd>: Restart game  
+<kbd>Ctrl+N</kbd>: Restart game at any point  
+<kbd>M</kbd>: Mute / Unmute game music  
 <kbd>Delete</kbd>: Debug mode
 
 
@@ -32,42 +35,37 @@ If you are able to destroy **_half of the total number of enemy tanks_** quickly
 ### File Format Specifications
 The stage files are stored using the `.json` format.    
 It is named `levelXX.json`. Where **XX** is the level number of the stage file.  
-If the level number is less than 10, a leading zero must be added. (`level01.json`)  
+If the level number is less than 10, a leading zero must be added. (for example, `level01.json`)  
 Stage files are to be placed in `assets/levels/`.
+
 
 ### Stage File Contents
 A stage file consists of the following:
-- `level`  
- Must be an integer.  
+- `level` -> `int`  
  The level number of the stage
 
-- `stage_name`  
- Must be a string.  
+- `stage_name` -> `str`   
  The name of the stage.
 
   Can be at most 12 characters long (including spaces)
 
-- `enemy_count`  
- Must be an integer.  
+- `enemy_count` -> `int`   
  Specifies the amount of enemy tanks the stage.
 
-- `powerup_req`  
- Must be an integer.  
+- `powerup_req` -> `int`  
  Specifies the time (in frames) until the powerup can be obtained in that stage.
   
   See [Powerups](#powerups) for more information.
 
-- `tutorial`  
- Must be an integer.  
+- `tutorial` -> `int`  
  Specifies what tutorial information will be shown in the sidebar.
  
-  The default value is 0 if there is no tutorial for that specific stage.
+  The default value is `0` if there is no tutorial for that specific stage.
 
-- `map`  
- A list of lists containing integers.  
+- `map` -> `list[list[int]]`  
  This represents the map for that stage as a grid of cells.  
- Each entity/cell type in the map is represented as an integer from 0-9.  
- A standard map has a grid size of 25 x 17 cells.
+ Each entity/cell type in the map is represented as an integer from `0-9`.  
+ A standard map has a grid size of `25 x 17` cells.
 
   See [Map Index Values](#map-index-values) for the list of cell/entity types
 
@@ -141,6 +139,8 @@ To access the debug mode (and access the debug maps) for game testing, press <kb
 
 Debug mode allows for a set of debug maps to be played specifically made for testing, debug messages toggled in the console and debug controls toggled for close analysis of the game states.
 
+Stage files for debug levels use the same format as normal stage files, however they must be named `debuglevelXX.json`.
+
 Debug maps are stored in `assets/levels/debug_levels`. You may add more debug levels here for specific testing.
 
 Close and reopen the game in order to return to the normal maps.
@@ -153,6 +153,7 @@ Close and reopen the game in order to return to the normal maps.
 <kbd>EQUALS</kbd>: Go to the next level  
 <kbd>INSERT</kbd>: Use debug mode on regular levels
 
+
 ## Contributions
 
 ### Mansur Batistil
@@ -160,7 +161,8 @@ Close and reopen the game in order to return to the normal maps.
 - First implementation for Map_Database System
 - Stage File / loading system
 - First implementations for Stone, Brick, Mirror, Water, Forest 
-- Sound Effects / Lives
+- Music / Sound Effects
+- HP / Lives
 - Powerup / Restart Game
 - Cheat Code & Debug Mode
 - Documentation
@@ -178,4 +180,4 @@ Close and reopen the game in order to return to the normal maps.
 
 ## Demo Video
 
-todo
+[Gameplay Demo](https://drive.google.com/file/d/1vMCZBMFLhfkIajVDX65otKoMLW5msomZ/view?usp=sharing)

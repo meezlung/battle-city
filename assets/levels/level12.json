@@ -1,9 +1,9 @@
 {
     "level":12,
-    "stage_name": "Not Battle City",
+    "stage_name": "NotBattleCity",
     "enemy_count": 20,
     "powerup_req": 2150,
-    "tutorial": -1,
+    "tutorial": 0,
     "map": [
         [2,2,2,0,0,0,0,0,0,0,0,2,2,2,0,0,0,0,0,0,0,0,2,2,2],
         [0,2,2,0,0,0,0,0,0,0,2,2,2,2,2,0,0,0,0,0,0,0,2,2,0],
