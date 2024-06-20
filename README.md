@@ -7,6 +7,16 @@ This game implements all the specifications from **Phase 1** up to **Phase 3**, 
 
 The game background music is an arrangement of _"American Patrol"_ (Frank White (F.W.) Meacham, 1885). More specifically, it is based on the [stage 1 music](https://www.youtube.com/watch?v=NFHvcxBCeb4) used in the NES port of the game _"Circus Charlie"_ (Konami, 1986)
 
+## How to Run
+
+Install Python and [Pyxel](https://github.com/kitao/pyxel?tab=readme-ov-file#how-to-install) if you haven't already.
+
+Go to the main directory of the game and run the following command:  
+``` python main.py ```
+
+Or run the `.pyxapp` directly using the following command:   
+``` pyxel play battle-city ```
+
 
 ## Controls
 
