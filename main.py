@@ -129,7 +129,7 @@ class Game:
         self.is_shoot_bullet = False
         self.should_overwrite_bullet = False
 
-        #pyxel.playm(0, loop=True) # :3 
+        pyxel.playm(1, loop=True) # :3 
         self.cheat_input: list[str] = []
         self.debug_input = 0
         self.alt_cheat_input = 0
@@ -591,7 +591,7 @@ class Game:
         if self.rem_tanks == self.num_tanks//2 and self.time < self.powerup_time_limit and not self.powerup_got:
             self.hp += 1
             self.powerup_got = True
-            pyxel.play(1, 3)
+            pyxel.play(2, 3)
 
     def cheat(self):
         if not self.cheat_input:
@@ -601,7 +601,7 @@ class Game:
             self.hp += 1
             self.input_timer = 0
             self.alt_cheat_input = 0
-            pyxel.play(1, 3)
+            pyxel.play(2, 3)
             print('CHEATCODE ACTIVATED!, current lives:' + str(self.hp))
         elif self.debug_input == 5 and pyxel.frame_count < self.input_timer:
             self.internal_level = 1
