@@ -125,7 +125,7 @@ The input is as follows (on keyboard): <kbd>Up</kbd>,<kbd>Up</kbd>,<kbd>Down</kb
 ---
 
 Note: Pyxel does not have a method for detecting if **any** key was pressed. Only if **a specified** key was pressed.  
-Because of this, the cheat code input was implemented in such a way that it only activates if the specified keys were pressed **in order** within the timeframe of **5 seconds**. If the input was in the incorrect sequence or there was too much/too little input, the input list will be reset.
+Because of this, the cheat code input was implemented in such a way that it only activates if the specified keys were pressed **in order** within the timeframe of **5 seconds**. If the input was in the incorrect sequence or there was too much/too little input after the 5 second timeframe, the input list will be reset.
 
 If you messed up attempting to do the cheat code, _please wait 5 seconds and try again._
 
