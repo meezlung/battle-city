@@ -12,10 +12,14 @@ The game background music is an arrangement of _"American Patrol"_ (Frank White 
 Install Python and [Pyxel](https://github.com/kitao/pyxel?tab=readme-ov-file#how-to-install) if you haven't already.
 
 Go to the main directory of the game and run the following command:  
-``` python main.py ```
+``` 
+python main.py 
+```
 
 Or run the `.pyxapp` directly using the following command:   
-``` pyxel play battle-city ```
+``` 
+pyxel play battle-city 
+```
 
 
 ## Controls
