@@ -167,7 +167,7 @@ Close and reopen the game in order to return to the normal maps.
 
 ### Gabriel Mislang
 - Main input system
-- Final implemntations for Enemy Tank + Variants, Mirror, Home Base
+- Final implementations for Enemy Tank + Variants, Mirror, Home Base
 - Final implementations for Map_Database System
 - Tank movement and collision detection system
 - Enemy Tank AI
