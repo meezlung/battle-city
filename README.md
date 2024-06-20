@@ -160,12 +160,13 @@ Close and reopen the game in order to return to the normal maps.
 - First implementation for Map_Database System
 - Stage File / loading system
 - First implementations for Stone, Brick, Mirror, Water, Forest 
-- Sound Effects
-- Powerup
-- Cheat & Debug Mode
+- Sound Effects / Lives
+- Powerup / Restart Game
+- Cheat Code & Debug Mode
 - Documentation
 
 ### Gabriel Mislang
+- Main input system
 - Final implemntations for Enemy Tank + Variants, Mirror, Home Base
 - Final implementations for Map_Database System
 - Tank movement and collision detection system
