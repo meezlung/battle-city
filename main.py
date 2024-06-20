@@ -349,7 +349,7 @@ class Game:
             if not isinstance(is_from, Bullet):
                 is_from.bullet.is_shoot = False
                 is_from.is_shoot = False 
-            else: # From Bullet
+            else: # From Bullet, meaning from dead tanks
                 if is_from.label == 'player':
                     is_from.is_shoot = False
                 else:
@@ -459,6 +459,8 @@ class Game:
             orient = mirror.orientation
             if isinstance(self.map_database[last_bullet_pos_before_hitting_mirror[1]][last_bullet_pos_before_hitting_mirror[0]], Bullet):
                 self.map_database[last_bullet_pos_before_hitting_mirror[1]][last_bullet_pos_before_hitting_mirror[0]] = 0
+            if isinstance(self.duplicate_map_database[last_bullet_pos_before_hitting_mirror[1]][last_bullet_pos_before_hitting_mirror[0]], Bullet):
+                self.duplicate_map_database[last_bullet_pos_before_hitting_mirror[1]][last_bullet_pos_before_hitting_mirror[0]] = 0
             self.movement(direction, "bullet", prev_mirror_call_pos[0], prev_mirror_call_pos[1], is_from, True, orient, how_many_times_is_mirror_called + 1, (mirror.x, mirror.y))
 
     def move_bullet(self, direction: Literal['left', 'right', 'up', 'down'], curr_x: int, curr_y: int, new_x: int, new_y: int, is_from: Tank | EnemyTank | Bullet):
@@ -789,7 +791,7 @@ class Game:
         if not self.map_loaded:
             self.load()
 
-        if pyxel.frame_count % 180 == 0 and self.concurrent_enem_spawn < self.num_tanks: #enemy tank spawns in an interval of 3 seconds, maybe this can be configured in the map file for increasing difficulty
+        if pyxel.frame_count % 180 == 0 and self.concurrent_enem_spawn < self.num_tanks: # Enemy tank spawns in an interval of 3 seconds, maybe this can be configured in the map file for increasing difficulty
             self.generate_enem_tank()
 
         self.cheat()
